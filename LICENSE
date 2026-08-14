@@ -1,0 +1,23 @@
+ros2_airlock proprietary license
+
+Copyright © Husarion. All rights reserved.
+
+The software packages distributed through this repository (Debian packages,
+container images, and associated artifacts) are proprietary software owned by
+Husarion.
+
+You may download and install these packages for use with Husarion robots and
+for evaluation and development on your own machines. You may not redistribute,
+sublicense, sell, modify, decompile, or reverse engineer the software, in whole
+or in part, except to the extent such a restriction is prohibited by applicable
+law.
+
+The software is provided "as is", without warranty of any kind, express or
+implied. In no event shall Husarion be liable for any claim, damages, or other
+liability arising from the use of the software.
+
+Third-party open-source components contained in the packages are used under
+their respective licenses (Apache-2.0/MIT), with attributions included in the
+package's NOTICE file.
+
+For commercial terms, other uses, or questions: support@husarion.com.
