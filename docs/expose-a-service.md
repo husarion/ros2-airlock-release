@@ -31,6 +31,15 @@ The call crosses the wall, executes on the robot's real server, and the response
 
 **No call ever hangs.** `timeout_s` is the ceiling on every call. Upstream server down, peer half dead, entry removed by a reload, plain timeout: every failure path returns an error reply to the caller within bounded time. A dead robot-side server can never wedge a fleet-side caller's future.
 
+**A reply the airlock had to invent says so, and you must read it.** ROS services carry no error channel, so a call the bridge could not complete comes back as a default-initialized response — for `std_srvs/srv/Trigger` that is `success=false`, which on its own is exactly what a server refusing looks like. So every invented reply puts the reason in the response's `message` field, prefixed `airlock:`, and says that the request WAS forwarded and may have been executed:
+
+```text
+response:
+std_srvs.srv.Trigger_Response(success=False, message='airlock: TIMEOUT after 2.0 s waiting for the server's reply — the request was forwarded and MAY HAVE BEEN EXECUTED; this is not a refusal, verify the robot's state before retrying')
+```
+
+Treat that as "unknown", never as "no" — this bit us on a real robot, where an e-stop trigger the caller was told had failed had in fact latched. Automation calling a safety service should check the `message` prefix (or the robot's actual state) before deciding a command did not take effect. The halves count these per service in `status_<world>.json` and `/metrics` (`airlock_service_timeouts_total`), and `airlock doctor` fails while any are recorded — a service that times out regularly needs a longer `timeout_s` or a faster server, not a caller that learns to ignore it.
+
 **Requests are bounded.** `max_request_bytes` rejects oversized requests before they cross. Services are for commands and parameters, not bulk data; the shared-memory fast path is for topics.
 
 **The type's support library must be installed in both halves' containers.** Topics cross as raw bytes with no type code involved, but services convert between wire and in-memory representation at each world edge, which loads the type's support library at runtime. Standard ROS types ship with the image. For your own interface packages, extend the image with your interface debs (`FROM husarion/ros2-airlock` plus an `apt install` of your packages). A service whose typesupport is missing is skipped with a diagnostic, never fatal, and `airlock doctor` points at exactly this.
