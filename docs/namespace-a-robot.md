@@ -31,6 +31,8 @@ TF is where namespacing usually breaks, because frame names travel inside messag
 
 **`merged: true`** republishes into the fleet-global `/tf` and `/tf_static` with every `frame_id` and `child_frame_id` prefixed: `panther_1234/base_link`. Because a frame mentioned in TF must match the frame in sensor headers, merged mode also rewrites `header.frame_id` on every bridged stamped topic in the direction. This is the convention that lets one rviz session display N robots at once, each a distinct subtree of one tree: distinct topics, distinct TF subtrees, a RobotModel per robot.
 
+When only a few lanes need the merged-frame convention, put `frame_prefix: true` on those topic entries instead of enabling `merged` (schema 3). It runs the identical header rewrite — `header.frame_id` plus `child_frame_id` where the type has one, `shared_frames` honored, empty frames untouched — on that lane alone, while every other topic of the direction keeps byte-identical passthrough. The canonical case is a fleet-side EKF that fuses the robot's odometry and IMU: two `frame_prefix` lanes give it frames matching the merged tree without rewriting twenty other stamped topics.
+
 `shared_frames` lists frames left unprefixed in merged mode. The moment your robots localize against a common map, set `shared_frames: [map]` and the subtrees join at the shared root.
 
 Late joiners are handled: the airlock aggregates every static transform it has seen and re-latches the complete set, so an rviz started an hour after the robot still receives the full static tree.
