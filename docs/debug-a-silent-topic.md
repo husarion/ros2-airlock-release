@@ -50,6 +50,8 @@ On the destination half, `degraded` with `activate_resends` instead means the AC
 
 **7. `/dev/shm` is too small, or the budget refused the channel.** Channels preallocate `max_bytes × depth` at activation. In containers the default 64 MiB `/dev/shm` disappears fast under big `max_bytes`; set `shm_size` explicitly, and watch for the budget-refused diagnostic when the sum of active channels would exceed `ipc.shm_budget`.
 
+**8. You need to hear the transport itself.** The shared-memory transport (iceoryx2) logs at `error` by default — its info/warn chatter is suppressed because one class of warn fires per listener per message under load and measurably costs throughput. To turn it up for a debugging session, set `AIRLOCK_LOG_LEVEL` (or iceoryx2's own `IOX2_LOG_LEVEL`) in the half's environment: `trace|debug|info|warn|error|fatal`, case-insensitive. A typo degrades to the quiet default with a note rather than refusing to start.
+
 ## Tooling can lie to you
 
 Two `ros2` CLI habits matter when your terminal hops between worlds. The CLI daemon caches the graph per environment it was started in, so after switching `ROS_DOMAIN_ID` or RMW in a shell, `ros2 topic echo` may claim it cannot determine a topic's type: pass the type explicitly (as the snippets on these pages do) or run `ros2 daemon stop` after switching. And remember an echo is itself a subscriber: observing a lazy topic activates it, so "it only flows when I look at it" is not a bug, it is the design working.
