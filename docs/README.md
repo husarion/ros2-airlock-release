@@ -2,7 +2,7 @@
 
 The airlock joins two ROS 2 worlds that may differ in RMW implementation, RMW configuration, domain ID, and namespace, and forwards exactly what its config allows: allowlisted topics, services, and actions, each with hard rate and size caps. Your robot runs in an isolated world nothing can discover; your fleet tools see a curated, namespaced API.
 
-Install instructions (apt and Docker) are in the [release repository README](https://github.com/husarion/ros2-airlock-release#readme). The zero-config demo is one command away after install:
+Install instructions (apt and Docker) are in the [release repository README](https://github.com/husarion/ros2-airlock-release#readme). The airlock ships one image and one deb per supported ROS 2 release: `husarion/ros2-airlock:<version>` and `ros-jazzy-ros2-airlock` for Jazzy, `:<version>-humble` and `ros-humble-ros2-airlock` for Humble, `:<version>-lyrical` and `ros-lyrical-ros2-airlock` for Lyrical, the same engine version in each. The zero-config demo is one command away after install (source the release you installed):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
