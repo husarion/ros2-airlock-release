@@ -17,6 +17,9 @@ Each page below is one task and starts with a working snippet:
 4. [Namespace a robot](namespace-a-robot.md) — prefixes, renames, and TF for one robot or a fleet.
 5. [Harden — the airlock pattern](harden-the-airlock-pattern.md) — the production profile: deny-by-default, forensics, deployment isolation.
 6. [Debug a silent topic](debug-a-silent-topic.md) — `airlock doctor` and the ladder of reasons a topic isn't flowing.
+7. [Bridge two ROS 2 releases](bridge-two-ros2-releases.md) — a robot on one release, a fleet on another, one airlock between them; what `same`, `converted` and `refused` mean.
+8. [Write a type rule](write-a-type-rule.md) — from a refused lane in the doctor's output to a rule file both halves reload.
+9. [Check your own types before you deploy](check-your-types-before-you-deploy.md) — `airlock drift` on your two images, and how to read its report.
 
 Configuration reference: every config key is machine-validated by [`airlock.schema.json`](https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json). Put the `yaml-language-server` header from the snippets in your own files and your editor autocompletes and validates as you type. `ros2 run ros2_airlock airlock check <file>` validates offline and explains every error with the rule and the fix.
 
