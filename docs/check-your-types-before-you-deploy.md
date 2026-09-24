@@ -3,7 +3,7 @@
 Before a robot on one ROS 2 release meets a fleet on another, find out what will cross untouched, what will be converted, what needs a rule and what cannot be bridged at all, with nothing running on a robot. On a machine with Docker and the airlock installed:
 
 ```bash
-ros2 run ros2_airlock airlock drift husarion/ros2-airlock:1.19.0 husarion/ros2-airlock:1.19.0-humble -c airlock.yaml --markdown drift.md
+ros2 run ros2_airlock airlock drift husarion/ros2-airlock:1.20.0 husarion/ros2-airlock:1.20.0-humble -c airlock.yaml --markdown drift.md
 ```
 
 It pulls every message, service and action definition out of both images, converts sample messages of every type that differs in both directions, checks each result on the destination image with that release's own generated code, and writes one report. The first line is the verdict:
@@ -46,8 +46,8 @@ The airlock's generic publishers and clients load a type's support library when 
 A type is a different thing on each release, so build one overlay per release you deploy and run the drift report on the pair of overlays:
 
 ```bash
-docker build -f Dockerfile.ugv --build-arg BASE=husarion/ros2-airlock:1.19.0 -t my-airlock:jazzy .
-docker build -f Dockerfile.ugv --build-arg BASE=husarion/ros2-airlock:1.19.0-humble -t my-airlock:humble .
+docker build -f Dockerfile.ugv --build-arg BASE=husarion/ros2-airlock:1.20.0 -t my-airlock:jazzy .
+docker build -f Dockerfile.ugv --build-arg BASE=husarion/ros2-airlock:1.20.0-humble -t my-airlock:humble .
 ros2 run ros2_airlock airlock drift my-airlock:jazzy my-airlock:humble -c airlock.yaml --markdown drift.md
 ```
 
