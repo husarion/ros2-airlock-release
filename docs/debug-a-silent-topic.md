@@ -1,6 +1,25 @@
 # Debug a silent topic
 
-A topic you expected in the destination world is missing, or present but silent. Start with the doctor, in a shell with the same environment as one of the halves:
+A topic you expected in the destination world is missing, or present but silent. Start with `trace`, which follows that one name across the wall and names the first hop that fails:
+
+```bash
+ros2 airlock trace /scan
+```
+
+```text
+trace /scan (topic)
+  ok  name        carried by an exact entry of robot -> fleet (/etc/airlock/airlock.yaml)
+  ok  entry       live
+  ok  peer        both halves connected
+  ok  source      1 publisher(s) in the robot world
+  FAIL demand      lazy, nothing subscribes
+
+/scan is lazy and nothing subscribes to /panther_1234/scan in the fleet world, so nothing crosses yet; it activates on the first subscriber of /panther_1234/scan
+```
+
+The last line is the answer: what is wrong and what to change. `trace` also catches a misspelled name (it offers the closest names the halves have seen), a name no entry carries (it prints the entry to add), a glob `exclude:` that removes it, an entry that expired, and a name that crosses under another name. Run it as the halves' user, next to their files; [the toolbox page](use-the-toolbox.md) has the details, and `ros2 airlock top` shows every lane's rate and drops live.
+
+For the whole pair at once, run the doctor, in a shell with the same environment as one of the halves:
 
 ```bash
 ros2 run ros2_airlock airlock doctor -c airlock.yaml
@@ -44,7 +63,7 @@ On the destination half, `degraded` with `activate_resends` instead means the AC
 
 **2. The entry doesn't match, or matches in the wrong direction.** Names in a direction are `from`-world names, before the namespace prefix. The prefix applies on republish, so the entry says `/scan` even though the fleet world sees `/panther_1234/scan`. Run `ros2 run ros2_airlock airlock check airlock.yaml` after every edit; it catches structural mistakes offline.
 
-**3. A cap is dropping.** The `DROPPING` counters name the cap: `dropped_size` means messages exceed `max_bytes` (a common surprise on cameras and point clouds; the default is 10 MiB but the hardened profile sets far less), `dropped_rate` means `max_hz` decimation, and `evicted` means drop-oldest under overload, which is by design and only the newest data survives.
+**3. A cap is dropping.** The `DROPPING` counters name the cap: `dropped_size` means messages exceed `max_bytes` (a common surprise on cameras and point clouds; the default is 10 MiB but the hardened profile sets far less), `dropped_rate` means `max_hz` decimation, and `evicted` means drop-oldest under overload, which is by design and only the newest data survives. On a lane into the robot (the `ipc.listener` half), two more counters come from the other half's traffic: `dropped_rate` also counts the default cap of 1000 messages per second that applies when the entry sets no `max_hz`, and `dropped_invalid` or `dropped_nonfinite` mean the other half sent messages that do not parse as the configured type, or carry a NaN or an infinity under schema 6. Those two point at the sending half, not at this world; the doctor's `lane.inbound_invalid` and `peer.violations` lines say more, and a lane that keeps receiving bad frames is paused as `peer_invalid` and retried ([Harden: the airlock pattern](harden-the-airlock-pattern.md)).
 
 **4. The type doesn't agree.** A typed entry rejects a publisher of a different type, and a topic seen with two different types in the source world is skipped entirely; both raise a warn-once diagnostic in the half's log. In merged TF mode there is a stricter variant: frame rewriting fails closed, so a stamped type whose introspection typesupport is missing in the container drops every message and the doctor reports `dropped_rewrite` with the fix (install the interface package in the half's image).
 
