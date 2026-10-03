@@ -6,9 +6,9 @@ The airlock ships one image and one deb per release, all from one engine version
 
 | Release | Docker image | Deb |
 | -- | -- | -- |
-| Jazzy | `husarion/ros2-airlock:1.20.0` (also `:latest`) | `ros-jazzy-ros2-airlock` |
-| Humble | `husarion/ros2-airlock:1.20.0-humble` | `ros-humble-ros2-airlock` |
-| Lyrical | `husarion/ros2-airlock:1.20.0-lyrical` | `ros-lyrical-ros2-airlock` |
+| Jazzy | `husarion/ros2-airlock:1.22.0-jazzy` (also `:latest-jazzy`) | `ros-jazzy-ros2-airlock` |
+| Humble | `husarion/ros2-airlock:1.22.0-humble` | `ros-humble-ros2-airlock` |
+| Lyrical | `husarion/ros2-airlock:1.22.0-lyrical` | `ros-lyrical-ros2-airlock` |
 
 A cross-release pair is two containers from two of these images, sharing an IPC namespace and a volume. Save the config from [Bridge your first topic](bridge-your-first-topic.md) as `airlock.yaml` with one more topic, the one whose definition changed on Lyrical:
 
@@ -38,7 +38,7 @@ services:
     shm_size: 512mb
 
   airlock_robot:                # the robot's release
-    image: husarion/ros2-airlock:1.20.0
+    image: husarion/ros2-airlock:1.22.0-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     volumes:
@@ -47,7 +47,7 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world robot -c /etc/airlock/airlock.yaml"]
 
   airlock_fleet:                # the fleet's release
-    image: husarion/ros2-airlock:1.20.0-lyrical
+    image: husarion/ros2-airlock:1.22.0-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     volumes:
@@ -56,13 +56,13 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world fleet -c /etc/airlock/airlock.yaml"]
 
   talker:                       # stands in for your robot: same image as its half
-    image: husarion/ros2-airlock:1.20.0
+    image: husarion/ros2-airlock:1.22.0-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && ros2 topic pub -r 2 /transition_event lifecycle_msgs/msg/TransitionEvent '{timestamp: 12345000000, transition: {id: 3, label: activate}}' >/dev/null & exec ros2 topic pub -r 2 /chatter std_msgs/String 'data: hello through the airlock'"]
 
   listener:                     # stands in for your fleet tools: same image as the fleet half
-    image: husarion/ros2-airlock:1.20.0-lyrical
+    image: husarion/ros2-airlock:1.22.0-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec ros2 topic echo /my_robot/chatter std_msgs/msg/String"]
@@ -107,7 +107,7 @@ Topics that merely gained or lost a field convert automatically. Services and ac
 
 The airlock bridges the difference between its two halves. It cannot bridge the difference between the fleet half and the other nodes in the fleet world, and there is one that matters: ROS 2 changed the layout of its own discovery message between Humble and Iron. A Humble node on a domain shared with Jazzy or Lyrical nodes cannot read their discovery information. Data still flows, but the node cannot see the graph, `ros2 node list` comes back empty or fails, and the airlock's fleet half reports itself blind and the deployment dysfunctional. Jazzy and Lyrical nodes read each other fine.
 
-So pick the fleet half's release to match the nodes it will share a domain with: a Humble fleet gets the `-humble` image, a Jazzy or Lyrical fleet gets `:1.20.0` or `-lyrical`. The robot half follows the robot the same way (on Husarion robots it always does). If your fleet is mid-migration and both releases are on the network at once, give each release its own domain ID and run two airlock pairs from the robot, one per fleet domain, each with its own `ipc.dir` and its own fleet half on the matching image. The doctor names this situation: `this world contains participants of another ROS 2 release (Humble vs Iron+ discovery layout)`, with what the half saw, and the half reports itself dysfunctional with the same cause rather than merely blind. Data keeps crossing while it does, and the half does not try to re-create its participant over it, because a new participant of the same release reads the same samples.
+So pick the fleet half's release to match the nodes it will share a domain with: a Humble fleet gets the `-humble` image, a Jazzy or Lyrical fleet gets `-jazzy` or `-lyrical`. The robot half follows the robot the same way (on Husarion robots it always does). If your fleet is mid-migration and both releases are on the network at once, give each release its own domain ID and run two airlock pairs from the robot, one per fleet domain, each with its own `ipc.dir` and its own fleet half on the matching image. The doctor names this situation: `this world contains participants of another ROS 2 release (Humble vs Iron+ discovery layout)`, with what the half saw, and the half reports itself dysfunctional with the same cause rather than merely blind. Data keeps crossing while it does, and the half does not try to re-create its participant over it, because a new participant of the same release reads the same samples.
 
 ## Where the rules live
 

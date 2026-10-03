@@ -107,7 +107,7 @@ Expiring entries need a synchronised clock. Until the kernel reports the clock s
 
 - **The config has no `include_dir`.** The tool treats it as managed by something else and never rewrites it. It prints the config's `managed_by:` value if it has one. On Husarion robots the config is rendered by Husarion Cockpit: add lanes from its Lanes page instead. Otherwise add `include_dir` as above, or use `--write` and edit the config yourself.
 - **A half lacks a capability.** Trials need both halves on 1.22.0 or later (the status lists `include_dir` and `expires`); the tool names the half that lacks it.
-- **The tool cannot signal the halves.** From another PID namespace (a separate container), the fragment is written, the tool prints the reload command to run (`docker kill -s HUP <container>` for each half) and exits 3.
+- **The tool cannot signal the halves.** From another PID namespace (a separate container), the fragment is written, the tool prints the reload command to run (`docker kill -s HUP <container>` for each half) and exits 3. When it can signal one half and both halves run a release that speaks protocol 1.7 or later, it signals that half, which asks the other to re-read its config, so one signal is enough.
 
 ## More ways to use it
 
