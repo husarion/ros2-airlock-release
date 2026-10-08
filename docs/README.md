@@ -22,7 +22,7 @@ Each page below is one task and starts with a working snippet:
 09. [Check your own types before you deploy](check-your-types-before-you-deploy.md): `airlock drift` on your two images, and how to read its report.
 10. [Let the airlock learn your allowlist](learn-your-allowlist.md): `ros2 airlock learn` proposes the config from what your worlds do; try it for five minutes, then keep it or let it expire.
 11. [Answer everyday questions with the toolbox](use-the-toolbox.md): `trace`, `top`, `check --dry-run`, `open` and `close`, `history` and `init`.
-12. [Move a config to schema 6](move-a-config-to-schema-6.md): what the new schema changes, its new keys, and the preview `airlock check` prints for your file.
+12. [Move a config to schema 7](move-a-config-to-schema-7.md): `ros2 airlock migrate` rewrites an older file, what it leaves to you, and the shared memory a file reserves.
 
 Configuration reference: every config key is machine-validated by [`airlock.schema.json`](https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json). Put the `yaml-language-server` header from the snippets in your own files and your editor autocompletes and validates as you type. `ros2 run ros2_airlock airlock check <file>` validates offline and explains every error with the rule and the fix.
 

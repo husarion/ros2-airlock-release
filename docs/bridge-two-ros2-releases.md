@@ -101,7 +101,7 @@ Every topic, service and action the config names ends in one of four states, and
 - **refused.** The definitions differ in a way the airlock will not guess about: a field changed its type or array size, a service or an action (which always need an explicit rule), or an entry you marked `protected` or `convert: deny`. A refused lane is absent from the destination world, and the doctor prints why and what fixes it, with a ready-to-paste rule when a rule is the fix. [Write a type rule](write-a-type-rule.md) walks through that.
 - **unchecked.** The other half runs an engine older than 1.18.0, which cannot describe its types; unprotected topics cross as they always did and protected ones are refused. Upgrade both halves and this state goes away.
 
-Topics that merely gained or lost a field convert automatically. Services and actions convert only under a rule that acknowledges every dropped or defaulted field, because a request silently missing a parameter is worse than a service that is visibly absent. You can tighten a topic the same way with `convert: explicit`, or forbid conversion outright with `convert: deny` (both need `schema: 5` in the config).
+Topics that merely gained or lost a field convert automatically. Services and actions convert only under a rule that acknowledges every dropped or defaulted field, because a request silently missing a parameter is worse than a service that is visibly absent. You can tighten a topic the same way with `convert: explicit`, or forbid conversion outright with `convert: deny` (both are keys of every entry).
 
 ## The fleet half must match the fleet, not just the robot
 

@@ -20,7 +20,7 @@ robot world, observed for 2 min (ledger live since 19:27)
   ! /cmd_vel          from fleet   geometry_msgs/msg/TwistStamped   1 sub · 2 min     unbounded (engine default) · deadman 200 ms · max_hz 50
 
   hidden: 15 plumbing names (@ros-noise and friends), 1 already configured  (--why-not <name>)
-  offline check: passes (airlock: <merged>/airlock.yaml is valid (schema 6, epoch 39d0b0cd122bcb1f, 1 fragments))
+  offline check: passes (airlock: <merged>/airlock.yaml is valid (schema 7, epoch 39d0b0cd122bcb1f, 1 fragments))
 
   write the proposal:   ros2 airlock learn --write learned.yaml
   try it for 5 minutes: ros2 airlock learn --apply --trial 5m
@@ -74,14 +74,14 @@ ros2 airlock learn --why-not /rosout          # why a name is left out
 
 ## Keep the proposal as a file
 
-`--format yaml` prints the proposal as a schema 6 fragment, one comment per entry with its evidence and rule; `--write learned.yaml` writes it after running the engine's own offline check over your config plus the proposal. A proposal that fails that check is a bug in learn mode, so `--write` refuses it. Paste the entries you want into your config, or move the file into the config's include directory (next section). `--format json` prints the same proposal for other tools (`schema/learn.schema.json`).
+`--format yaml` prints the proposal as a schema 7 fragment, one comment per entry with its evidence and rule; `--write learned.yaml` writes it after running the engine's own offline check over your config plus the proposal. A proposal that fails that check is a bug in learn mode, so `--write` refuses it. Paste the entries you want into your config, or move the file into the config's include directory (next section). `--format json` prints the same proposal for other tools (`schema/learn.schema.json`).
 
 ## Try it for five minutes
 
-To apply from the tool, the config must be schema 6 ([Move a config to schema 6](move-a-config-to-schema-6.md)) and name an include directory, a folder of fragment files the halves read beside the base file. These are the two lines that matter:
+To apply from the tool, the config must be schema 7 ([Move a config to schema 7](move-a-config-to-schema-7.md)) and name an include directory, a folder of fragment files the halves read beside the base file. These are the two lines that matter:
 
 ```yaml
-schema: 6
+schema: 7
 airlock:
   include_dir: airlock.yaml.d   # relative to the config file; the tools create it
 ```

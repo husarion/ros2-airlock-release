@@ -4,7 +4,7 @@ Write one file, start two processes, and a topic crosses from an isolated world 
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
-schema: 1
+schema: 7
 airlock:
   ipc: { dir: /tmp/airlock, listener: robot }
   worlds:
@@ -44,6 +44,8 @@ Terminal 4 prints `hello` twice a second. The message was published in domain 17
 **The worlds live in the environment, not in the file.** Each half is an ordinary ROS 2 node in whatever world its process environment describes: `RMW_IMPLEMENTATION`, `ROS_DOMAIN_ID`, and the RMW's own config file (`FASTRTPS_DEFAULT_PROFILES_FILE`, `CYCLONEDDS_URI`, `ZENOH_SESSION_CONFIG_URI`). The example varies only the domain, but the two halves can run different RMW implementations entirely; every ordered pair of fastrtps, cyclonedds, and zenoh is tested. The config file never mentions any of this, which is why changing the fleet network's RMW is a restart of the fleet half and nothing else.
 
 **Both halves read the same file.** `ipc.dir` is where they meet: the control socket and the shared-memory channels live there. On one machine a shared path is enough; in containers, mount the same volume into both and share the IPC namespace (`ipc: service:<peer>` in compose).
+
+**Every listed entry reserves its shared memory at start.** A topic costs `(max_bytes + 24) x (queue_depth + 3)` bytes plus a small fixed amount, and `airlock check` prints the total. A half refuses to start when the total does not fit its host's `/dev/shm`. Docker gives a container 64 MiB of it by default: set caps on your entries, as `max_bytes` does here, and give the container that owns the shared IPC namespace a larger `/dev/shm` when you need more (`docker run --shm-size=1g`, or `shm_size: 1gb` in compose).
 
 **Only what you list exists.** Run `ROS_DOMAIN_ID=18 ros2 topic list` in the fleet world: you see `/my_robot/chatter` and the airlock's own node, and nothing else from the robot world. A direction is a deny-by-default allowlist; a topic not listed is absent from discovery entirely, not merely filtered.
 
