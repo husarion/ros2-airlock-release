@@ -81,3 +81,4 @@ The image build refuses a file that differs from the binary's output or that say
 | `api.ledger` | object | The call ledger per callable service: `ids` remembered, `outcomes` kept and `keep_s`, how long an outcome is kept. |
 | `api.sample_schema` | integer | The version of a sample reply's document. |
 | `api.call_schema` | integer | The version of a call reply's document (`schema/api_call.schema.json`). |
+| `api.retain_max` | integer | The most lanes `api.retain` may name (1.26.1): each keeps one standing reader in the half's world. |

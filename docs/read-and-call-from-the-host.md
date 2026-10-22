@@ -14,6 +14,7 @@ airlock:
       api:
         socket: /run/airlock-robot/api/api.sock
         calls: [/hardware/e_stop_trigger, /hardware/e_stop_reset]
+        retain: [/hardware/e_stop]
         local:
           services:
             - service: /hardware/e_stop_reset
@@ -50,7 +51,7 @@ ros2 airlock sample /hardware/e_stop -c /etc/airlock/airlock.yaml --field data
 ros2 airlock call /hardware/e_stop_trigger -c /etc/airlock/airlock.yaml
 ```
 
-The sample is the lane's newest message, read by the half inside its own world, with `publishers`, `latched` (the half saw a message older than its reader, which is how a latched topic looks) and `age_s` beside it. The lane itself does not change: a sample is not demand, it starts no flow and moves no counter of the wall.
+The sample is the lane's newest message, read by the half inside its own world, with `publishers`, `latched` (the half saw a message older than its reader, which is how a latched topic looks) and `age_s` beside it. The lane itself does not change: a sample is not demand, it starts no flow and moves no counter of the wall. `/hardware/e_stop` is listed under `retain` (from engine 1.26.1), so the half keeps a reader on it all the time and answers from the newest message that reader took, marked `retained: true`, with `age_s` counted from when it arrived; the next section says why a polled latched topic wants that.
 
 ## What the socket serves, and to whom
 
@@ -74,6 +75,7 @@ A host call goes through a client the half owns, never through the wall's lane, 
 | -- | -- |
 | `--world <w>` | the half to ask, when both worlds have an `api:` block |
 | `--wait <s>` | `sample`: seconds to wait for a message (default 2, at most 10) |
+| `--fresh` | `sample`: read a lane listed in `api.retain` through a new reader of its own instead of the kept copy (1.26.1) |
 | `--format json\|yaml\|value` | `json` prints the half's reply line exactly as it came; `yaml` (default) the sample or call for people; `value` the message only |
 | `--field a.b.0` | `sample`: one field of the message |
 | `--request '<json>'` | `call`: the request as a JSON object (default `{}`) |
@@ -94,11 +96,13 @@ Both halves write into `ipc.dir` and `forensics.dir` by default, which both cont
 
 Nothing on the engine's side of the wall: the requests run on one thread, `alk-api`, at normal priority, which takes no lock a lane's pump takes and never touches a lane. A sample creates and removes one reader inside the half's world, which the DDS itself serializes with the other endpoints of that participant, so a real-time pump publishing at that moment can wait on it; the sample rate limit (5 a second by default) bounds how often, and the release's rig run measures the effect on the tf and control lanes.
 
-The world pays for each sample, though: every participant in it, the driver's nodes included, processes the reader's arrival and departure. On a Lynx (Raspberry Pi 4) one sample of the e-stop cost the driver container 30 to 40 ms of CPU, so a tool that samples continuously at the default limit of 5 a second costs the driver about 17 % of one core, and one a second about 4 %, while `/tf` latency did not move. That is still far cheaper than a `ros2 topic echo --once`, whose fresh participant cost the same driver about 1.3 s of CPU per read. Poll a topic no faster than you need: set `api.rate.samples` to `{ per_s: 1, burst: 5 }` on a robot whose tools poll, and read state the status file already carries (health, the lane rows, `last_sample_age_s`) from `graph` instead of a sample.
+The world pays for each sample, though: every participant in it, the driver's nodes included, processes the reader's arrival and departure. On a Lynx (Raspberry Pi 4) one sample of the e-stop cost the driver container 30 to 40 ms of CPU, so a tool that samples continuously at the default limit of 5 a second costs the driver about 17 % of one core, and one a second about 4 %, while `/tf` latency did not move. That is still far cheaper than a `ros2 topic echo --once`, whose fresh participant cost the same driver about 1.3 s of CPU per read.
+
+The remedy for a topic a tool polls, the latched control topics above all, is `api.retain` (engine 1.26.1): list the topic there and the half creates one reader for it when the surface starts and keeps it for its whole run, so a sample of it creates nothing in the world and the driver pays nothing per sample. The reader is one more endpoint in the world for as long as the half runs, which is why the list is explicit (at most 16 names, each an exact topic entry this world carries out, which `samples` allows and whose `max_bytes` fits `api.max_raw_sample_bytes`); `check` lists the retained lanes and that cost. A retained answer is the newest message the reader took, never an older one: before the first message arrives a sample waits for it up to `--wait` and then answers `no_publisher` or `timeout`, and while a participant rebuild has the reader down it answers `blind`. `--fresh` (`"fresh": true` on the socket) still reads through a new reader of its own, at the old cost. For a topic you do not retain, poll no faster than you need: set `api.rate.samples` to `{ per_s: 1, burst: 5 }` on a robot whose tools poll, and read state the status file already carries (health, the lane rows, `last_sample_age_s`) from `graph` instead of a sample.
 
 ## Where to look
 
-- the status file's `api` block: whether the socket is bound, the connections, every request and refusal by its code, the `api.local` names with their uses, the surface's own service clients ([status reference](status-and-health-reference.md#the-host-request-surface));
+- the status file's `api` block: whether the socket is bound, the connections, every request and refusal by its code, the `api.local` names with their uses, the surface's own service clients, the retained lanes with their readers' state (`api.retained`) ([status reference](status-and-health-reference.md#the-host-request-surface));
 - each `tx` row's `samples`, `sample_errors` and `last_sample_age_s`, and each serving `services` row's `local_calls`;
 - `ros2 airlock api` marks a lane the host sampled in the last status period `host read` and lists every `api.local` name as a row carried by `local`, with the serving half's evidence alone;
 - `ros2 airlock top` prints `api: N conn, samples S/s, calls C/min, refused R` per half;

@@ -392,7 +392,7 @@ A half whose world's config carries an `api:` block serves a local socket for ho
 
 `stopped` is the thread waiting for its restart (after 1 s, doubling to 60 s; `restarts` counts them); `airlock doctor` reports it as `api.thread_stopped`, a socket the half does not hold as `api.socket_unbindable`, a uid refused in the last 5 minutes as `api.refused_uid`.
 
-The `sample` operation (1.26.0) counts every outcome under `api.samples`: `served` (and `truncated`, those of them cut at the reply cap), then one counter per error code (`no_publisher`, `timeout`, `invalid`, `not_carried`, `not_allowed`, `type_unsupported`, `size`, `blind`, `internal`). A refusal before the operation runs (`scope`, `busy`, `rate`, `invalid_request`) counts under `api.refused`. Each `tx` row carries `samples`, the host's samples of that lane served, `sample_errors`, the ones that failed by code (a code that never happened is absent), and `last_sample_age_s`, the seconds since the last one was served (null when never; `airlock api` shows a lane read within the last status period as `host_read`); a sample never demands the lane or moves its `forwarded`. `airlock doctor` reports `api.type_unsupported` when a sample asked for a type this image cannot describe. `/metrics` carries `airlock_api_samples_total{topic,outcome}` per carried name.
+The `sample` operation (1.26.0) counts every outcome under `api.samples`: `served` (and `truncated`, those of them cut at the reply cap), then one counter per error code (`no_publisher`, `timeout`, `invalid`, `not_carried`, `not_allowed`, `type_unsupported`, `size`, `blind`, `internal`), and `retained` (1.26.1, below). A refusal before the operation runs (`scope`, `busy`, `rate`, `invalid_request`) counts under `api.refused`. Each `tx` row carries `samples`, the host's samples of that lane served, `sample_errors`, the ones that failed by code (a code that never happened is absent), and `last_sample_age_s`, the seconds since the last one was served (null when never; `airlock api` shows a lane read within the last status period as `host_read`); a sample never demands the lane or moves its `forwarded`. `airlock doctor` reports `api.type_unsupported` when a sample asked for a type this image cannot describe. `/metrics` carries `airlock_api_samples_total{topic,outcome}` per carried name.
 
 The `call` operation (1.26.0) counts every outcome under `api.calls`: `served` (the server answered), `synthesized` (the surface made the reply up and says why), `duplicate` (a retry answered from the ledger, executing nothing), then one counter per error code (`not_served`, `not_allowed`, `invalid_request`, `size`, `blind`, `type_unsupported`, `internal`). A refusal before the operation runs (`scope`, `inflight`, `rate`) counts under `api.refused`. `api.last_synthesized` names the newest synthesized reply (its service, reason, age and the count so far); `airlock doctor` reports one in the last 5 minutes as `api.call_synthesized`. The reasons, fixed:
 
@@ -425,6 +425,18 @@ The `call` operation (1.26.0) counts every outcome under `api.calls`: `served` (
 - live
 - cached
 ```
+
+A lane listed in `api.retain` (1.26.1) has a standing reader the half keeps for its life, and a sample of it answers from the newest message that reader took (the reply carries `retained: true`) unless the request asks `fresh: true`. `api.samples.retained` counts the answers served that way (each one is in `served` too), and `api.retained[]` lists every retained lane in the order the config names them: `matched` and `publishers` (the reader's matched publishers), `last_receipt_age_s` (the newest message's receipt, null before the first), `samples` (the answers served from it), `readers_created` (one per creation: the first, a publisher of another durability or reliability joining, a participant rebuild), and its state:
+
+```yaml
+# status: api.retained[].state
+- waiting
+- none
+- held
+- blind
+```
+
+`waiting` has no reader yet: no publisher of the lane is discovered, or its type is not known yet. `none` has a reader and no message yet; a sample then waits for the first up to its `wait_s` and answers `no_publisher` or `timeout` when none comes, never an older value. `held` holds the newest message. `blind` is a reader a participant rebuild tore down that is not back yet; a sample answers `blind`.
 
 ## The rest of the file
 
