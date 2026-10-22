@@ -20,7 +20,7 @@ robot world, observed for 2 min (ledger live since 19:27)
   ! /cmd_vel          from fleet   geometry_msgs/msg/TwistStamped   1 sub · 2 min     unbounded (engine default) · deadman 200 ms · max_hz 50
 
   hidden: 15 plumbing names (@ros-noise and friends), 1 already configured  (--why-not <name>)
-  offline check: passes (airlock: <merged>/airlock.yaml is valid (schema 7, epoch 39d0b0cd122bcb1f, 1 fragments))
+  offline check: passes (airlock: <merged>/airlock.yaml is valid (schema 9, epoch 39d0b0cd122bcb1f, 1 fragments))
 
   write the proposal:   ros2 airlock learn --write learned.yaml
   try it for 5 minutes: ros2 airlock learn --apply --trial 5m
@@ -53,6 +53,7 @@ The knowledge base also fills in settings from what the ledger saw:
 - A name that looks safety-related (`e_stop`, `estop`, `safety`, `emergency`) gets a lock suggestion, written as a comment. Learn never writes `protected: true` into a proposal: a trial entry cannot carry it, and removing a protected entry later needs a restart of both halves. Add it yourself once you keep the entry.
 - A velocity command into the robot gets `max_hz: 50` and a 200 ms `deadman` with a zero neutral.
 - Images, point clouds and occupancy grids stay lazy and are left for review.
+- A topic whose frames were larger than 256 KiB (`airlock.bulk_threshold_bytes`) gets `class: bulk` and the 4 MiB/s cap (`max_bytes_per_s`), which the engine would give it anyway once a large frame arrives; the entry says so, and you can raise the cap there ([Keep camera traffic away from tf](bounded-bulk-lanes.md)).
 - Sizes come from the types, never from probing: a fixed-size type such as `std_msgs/msg/Bool` gets an exact `max_bytes`, and anything with a string or a sequence in it (every type with a `Header`) gets no cap and is flagged "unbounded", so the engine's 10 MiB default applies.
 
 Learn also stays within `ipc.shm_budget`: candidates that would exceed it are proposed commented out, with the budget to add.
@@ -74,14 +75,14 @@ ros2 airlock learn --why-not /rosout          # why a name is left out
 
 ## Keep the proposal as a file
 
-`--format yaml` prints the proposal as a schema 7 fragment, one comment per entry with its evidence and rule; `--write learned.yaml` writes it after running the engine's own offline check over your config plus the proposal. A proposal that fails that check is a bug in learn mode, so `--write` refuses it. Paste the entries you want into your config, or move the file into the config's include directory (next section). `--format json` prints the same proposal for other tools (`schema/learn.schema.json`).
+`--format yaml` prints the proposal as a schema 9 fragment, one comment per entry with its evidence and rule; `--write learned.yaml` writes it after running the engine's own offline check over your config plus the proposal. A proposal that fails that check is a bug in learn mode, so `--write` refuses it. Paste the entries you want into your config, or move the file into the config's include directory (next section). `--format json` prints the same proposal for other tools (`schema/learn.schema.json`).
 
 ## Try it for five minutes
 
-To apply from the tool, the config must be schema 7 ([Move a config to schema 7](move-a-config-to-schema-7.md)) and name an include directory, a folder of fragment files the halves read beside the base file. These are the two lines that matter:
+To apply from the tool, the config must be schema 9 ([Move a config to schema 9](move-a-config-to-schema-9.md)) and name an include directory, a folder of fragment files the halves read beside the base file. These are the two lines that matter:
 
 ```yaml
-schema: 7
+schema: 9
 airlock:
   include_dir: airlock.yaml.d   # relative to the config file; the tools create it
 ```

@@ -53,13 +53,14 @@ ros2 airlock top
 ```
 
 ```text
-LANE                  DIR             STATE           RATE         BW     FRAME      P50      P99  DROPS
-/robot/chatter        robot->fleet    flowing         10.0    120 B/s      12 B    0.2ms    0.5ms  -
+LANE                  DIR             CLASS   STATE           RATE         BW     FRAME   AGE P50   AGE P99      GAP  DROPS
+/robot/chatter        robot->fleet    normal  flowing         10.0    120 B/s      12 B     0.4ms     0.9ms    101ms  -
 
 pair  robot: healthy, cpu 0.5%, rss 36.9 MiB, epoch 848ef817f7665165 | fleet: healthy, cpu 0.3%, rss 26.6 MiB, epoch 848ef817f7665165
+class fleet: control 0 lanes p99 - gap - capped 0, normal 1 lanes p99 0.9ms gap 101ms capped 0, bulk 0 lanes p99 - gap - capped 0
 ```
 
-One row per lane: direction, state, rate and bandwidth from the counter deltas, the largest frame seen, the forwarding delay p50 and p99, and drops by cause. The footer shows each half's health, CPU and memory. It refreshes at the status cadence (5 s) until Ctrl-C. `--sort rate|bw|frame|drops|p50|p99|state|lane` picks the order, `--once` prints one snapshot and exits, and `--format json` prints one snapshot per line.
+One row per lane: direction, class, state, rate and bandwidth from the counter deltas, the largest frame seen, the delivery age p50 and p99 (how old a sample is when the destination world sees it), the largest gap between two samples in the last 5 s, and drops by cause (`cap` is the bulk byte cap, see [Keep camera traffic away from tf](bounded-bulk-lanes.md)). The footer shows each half's health, CPU and memory, a line per half for each class, and, for a half whose config has an `api:` block, `api: N conn, samples S/s, calls C/min, refused R` (the host request socket's connections, request rates and refusals; see [Read and call the robot from the host](read-and-call-from-the-host.md)). Against a half older than 1.25.0 the age columns show its forwarding delay instead, marked `*`. It refreshes at the status cadence (5 s) until Ctrl-C. `--sort rate|bw|frame|drops|p50|p99|gap|class|state|lane` picks the order, `--class control|normal|bulk` shows one class, `--once` prints one snapshot and exits, and `--format json` prints one snapshot per line.
 
 ## `api`: what does this wall carry right now?
 
@@ -68,14 +69,14 @@ ros2 airlock api
 ```
 
 ```text
-DIR           KIND     EXPOSED             SOURCE         TYPE                       STATE       CHANNEL   RATE      CAPS                      CARRIED BY                   EVIDENCE
-robot->fleet  topic    /robot/chatter      /chatter       std_msgs/msg/String        flowing     -         10 Hz     <= 4.0 KiB                exact (airlock.yaml)         both
-robot->fleet  service  /robot/hw/fan       /hw/fan        std_srvs/srv/Trigger       advertised  released  -         req 1.0 KiB, resp 4.0 KiB glob /hw/** (airlock.yaml)   both
+DIR           KIND     EXPOSED             SOURCE         TYPE                       CLASS    STATE       CHANNEL   RATE      CAPS                      CARRIED BY                   EVIDENCE
+robot->fleet  topic    /robot/chatter      /chatter       std_msgs/msg/String        normal   flowing     -         10 Hz     <= 4.0 KiB                exact (airlock.yaml)         both
+robot->fleet  service  /robot/hw/fan       /hw/fan        std_srvs/srv/Trigger       control  advertised  released  -         req 1.0 KiB, resp 4.0 KiB glob /hw/** (airlock.yaml)   both
 
 complete | robot->fleet: 2 items, 1 glob
 ```
 
-One row per topic, service and action, sorted by direction and name: the name on both sides, the type, the lane state, the service channel (`released` until the first call, then `armed`), the rate, the caps and the entry that carries it, an exact one or a glob with its file. With a glob in the file the config no longer lists what is bridged, so this is the page to read. It is built only from the halves' status files and the running config: it starts no ROS participant and opens no socket. The listener's status is the authority; a row that only the connector's status vouches for reads `unverified`, its evidence column carries a `*` and its names are printed in quotes.
+One row per topic, service and action, sorted by direction and name: the name on both sides, the type, the lane's class, the lane state, the service channel (`released` until the first call, then `armed`), the rate, the caps and the entry that carries it, an exact one or a glob with its file. With a glob in the file the config no longer lists what is bridged, so this is the page to read. Since 1.26.0 the `host read` column marks a topic the host sampled through the half's socket within the last status period, and every `api.local` name of a half is a row of its own carried by `local`, with that half's evidence alone (`robot->host`): the host can reach it, the wall never carries it. It is built only from the halves' status files and the running config: it starts no ROS participant and opens no socket. The listener's status is the authority; a row that only the connector's status vouches for reads `unverified`, its evidence column carries a `*` and its names are printed in quotes.
 
 `--format json` prints the document of `schema/api.schema.json` (schema 1), the one the Cockpit's live API page relays. `--direction robot->fleet` and `--kind topic|service|action` filter, `--all` also lists config entries that carry nothing right now (`unmatched`), and `--single-sample` reads once and prints no rates (by default it waits for the next status write, up to three intervals, and takes the rate from the counters). The exit code is 0 when the picture is complete, 3 when it is not: one half has written no status for 15 s or is missing (the other half's rows are printed with `evidence: robot_only` or `fleet_only`), names were left out because a glob hit `max_lanes`, or rows were dropped as malformed. It is 2 when nothing can be read, when the file on disk is no longer the one the halves run (edit and reload first), or when a half is older than 1.24.0 and writes no lane carriers. On 2 and 3 the JSON is still printed, with `complete: false` and the reasons in `problems[]`.
 
@@ -97,7 +98,7 @@ dry run of next.yaml:
   [fleet] entry changed topic /chatter (max_hz)
   [fleet] kept      2 lane(s) unchanged
   [fleet] kept      1 service lane(s) unchanged (calls in flight survive)
-offline check: passes (airlock: <merged>/next.yaml is valid (schema 7, epoch bf3eee15107b0fa4, 1 fragments))
+offline check: passes (airlock: <merged>/next.yaml is valid (schema 9, epoch bf3eee15107b0fa4, 1 fragments))
   robot->fleet /chatter: matches 1 name(s) in the ledger now (/chatter)
 ```
 
@@ -148,16 +149,16 @@ ros2 airlock init --prove --dir mywall
 
 ```text
 wrote mywall/compose.yaml, mywall/airlock.yaml and mywall/airlock.yaml.d/
-airlock check: passes (airlock: <merged>/airlock.yaml is valid (schema 7, epoch dbbb64d7889d092c))
+airlock check: passes (airlock: <merged>/airlock.yaml is valid (schema 9, epoch dbbb64d7889d092c))
 PROVED: a message published on /airlock_prove in the robot world (rmw_fastrtps_cpp, domain 21) arrived on /robot/airlock_prove in the fleet world (rmw_cyclonedds_cpp, domain 22) after 2.7 s
 ```
 
-Without flags `init` asks three questions: the robot world's RMW and domain, the fleet world's, and which topics to carry out. It writes a `compose.yaml` with both halves in their worlds' environments (and a zenoh router when either world uses rmw_zenoh), an `airlock.yaml` at schema 7 with `include_dir: airlock.yaml.d` and a 64 KiB frame cap (`max_bytes`) on every topic that passes `airlock check`, and the empty include directory. The topic list can also come from `--from-topic-list <file>` (the output of `ros2 topic list -t`) or `--from-ledger <file>` (a running half's ledger). `--prove` runs both halves of the written config itself, on a private IPC directory, with a talker in the robot world and a listener in the fleet world, and prints whether a message crossed. Run it where the airlock is installed (the deb, or inside the image). Then `docker compose up -d` in that directory starts the wall, and `ros2 airlock learn` fills the allowlist once the robot runs.
+Without flags `init` asks three questions: the robot world's RMW and domain, the fleet world's, and which topics to carry out. It writes a `compose.yaml` with both halves in their worlds' environments (and a zenoh router when either world uses rmw_zenoh), an `airlock.yaml` at schema 9 with `include_dir: airlock.yaml.d` and a 64 KiB frame cap (`max_bytes`) on every topic that passes `airlock check`, and the empty include directory. The topic list can also come from `--from-topic-list <file>` (the output of `ros2 topic list -t`) or `--from-ledger <file>` (a running half's ledger). `--prove` runs both halves of the written config itself, on a private IPC directory, with a talker in the robot world and a listener in the fleet world, and prints whether a message crossed. Run it where the airlock is installed (the deb, or inside the image). Then `docker compose up -d` in that directory starts the wall, and `ros2 airlock learn` fills the allowlist once the robot runs.
 
-## `migrate`: bring an older config to schema 7
+## `migrate`: bring an older config to schema 9
 
 ```bash
 ros2 airlock migrate airlock.yaml
 ```
 
-An engine of 1.24.0 or later reads schema 7 only and refuses an older file, naming this command. `migrate` writes `airlock.schema7.yaml` beside your file (`--in-place` keeps a `.bak`), prints one line per change and the shared memory the new file reserves, and runs `check` on the result. [Move a config to schema 7](move-a-config-to-schema-7.md) lists what it writes and what it leaves to you.
+An engine of 1.26.0 or later reads schema 9 only and refuses an older file, naming this command. `migrate` reads any schema from 1 to 8 and writes `airlock.schema9.yaml` beside your file (`--in-place` keeps a `.bak`), prints one line per change and the shared memory the new file reserves, and runs `check` on the result. A schema 8 file only gets its version line changed. From an older file it also writes `class: bulk` and the 4 MiB/s cap on every camera-sized entry, so you can see which lanes are capped. [Move a config to schema 9](move-a-config-to-schema-9.md) lists what it writes and what it leaves to you.

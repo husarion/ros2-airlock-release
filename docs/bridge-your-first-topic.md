@@ -4,7 +4,7 @@ Write one file, start two processes, and a topic crosses from an isolated world 
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
-schema: 7
+schema: 9
 airlock:
   ipc: { dir: /tmp/airlock, listener: robot }
   worlds:

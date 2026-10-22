@@ -1,10 +1,10 @@
 # Harden — the airlock pattern
 
-The airlock pattern is the production profile this project exists for: the robot's full API readable, a tiny enumerated command surface writable, everything else nonexistent, and evidence kept at the boundary. This is the whole shape, schema 7:
+The airlock pattern is the production profile this project exists for: the robot's full API readable, a tiny enumerated command surface writable, everything else nonexistent, and evidence kept at the boundary. This is the whole shape, schema 9:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
-schema: 7
+schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot, queue_depth: 2, shm_budget: 268435456 }
   forensics: { dir: /var/lib/airlock, bag_max_bytes: 268435456, bag_split_bytes: 67108864 }
@@ -27,7 +27,7 @@ airlock:
           max_hz: 100
         - topic: /robot_description
           activation: always
-          max_bytes: 1048576
+          max_bytes: 1048576 # 1 MiB or more makes it a bulk lane, capped at 4 MiB/s: fine for a latched model
           qos: { durability: transient_local }
       tf: { namespaced: true, merged: true, shared_frames: [] }
       services:

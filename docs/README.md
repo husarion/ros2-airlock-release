@@ -22,7 +22,13 @@ Each page below is one task and starts with a working snippet:
 09. [Check your own types before you deploy](check-your-types-before-you-deploy.md): `airlock drift` on your two images, and how to read its report.
 10. [Let the airlock learn your allowlist](learn-your-allowlist.md): `ros2 airlock learn` proposes the config from what your worlds do; try it for five minutes, then keep it or let it expire.
 11. [Answer everyday questions with the toolbox](use-the-toolbox.md): `trace`, `top`, `check --dry-run`, `open` and `close`, `history` and `init`.
-12. [Move a config to schema 7](move-a-config-to-schema-7.md): `ros2 airlock migrate` rewrites an older file, what it leaves to you, and the shared memory a file reserves.
+12. [Move a config to schema 9](move-a-config-to-schema-9.md): `ros2 airlock migrate` rewrites an older file, what it leaves to you, and the shared memory a file reserves.
+13. [Threads and CPU pinning](threads-and-pinning.md): the name of every engine thread, which ones carry your traffic, and what a CPU pinner should do with them.
+14. [Keep camera traffic away from tf](bounded-bulk-lanes.md): the control, normal and bulk classes, the 4 MiB/s cap on bulk lanes, how to raise or lift it, and where to watch delivery age and dropped samples.
+15. [Status and health reference](status-and-health-reference.md): every value a status file carries that a dashboard branches on, the health verdicts in rung order with every reason, and what stays stable.
+16. [The constants contract](constants-contract.md): `airlock_half --constants`, the file and labels every image carries, and the rule for changing it.
+17. [The check plan contract](check-plan-contract.md): `ros2 airlock check <file> --plan --format json`, every entry's class, cap and real-time policy as one document a tool can read before a file is applied.
+18. [Read and call the robot from the host](read-and-call-from-the-host.md): `ros2 airlock sample` and `call` ask the half already in the robot's world through a local socket, instead of starting a participant per read; who may ask, the fallback rule, and status and forensics directories of each half's own.
 
 Configuration reference: every config key is machine-validated by [`airlock.schema.json`](https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json). Put the `yaml-language-server` header from the snippets in your own files and your editor autocompletes and validates as you type. `ros2 run ros2_airlock airlock check <file>` validates offline and explains every error with the rule and the fix.
 

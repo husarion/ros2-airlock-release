@@ -37,6 +37,8 @@ When only a few lanes need the merged-frame convention, put `frame_prefix: true`
 
 Late joiners are handled: the airlock aggregates every static transform it has seen and re-latches the complete set, so an rviz started an hour after the robot still receives the full static tree.
 
+`max_bytes` caps both tf lanes, like an entry's `max_bytes` (default 65536, about 500 transforms). A `/tf` message above it is dropped where it is taken, counted in the lane's `dropped_size`, and never crosses. A `/tf_static` aggregate above it is not shipped: the lane's row reads `tf_static_over_cap: true`, the half logs it, and the previous aggregate stays latched in the far world. The status rows' `max_frame_bytes` say what your tree really sends; raise `tf: {max_bytes: ...}` when it is near the cap. At 64 KiB or less the tf lanes can run at real-time priority (see [threads and pinning](threads-and-pinning.md)).
+
 **Do not mix the conventions in one consumer.** With both modes on, the direction publishes robot-local frames on the namespaced pair and prefixed frames on the merged pair. A consumer must pick one: either the raw pair plus its own prefixing, or merged `/tf` plus this direction's bridged topics. Mixing them makes TF lookups fail silently; `airlock doctor` prints a note whenever both modes are active.
 
 Frame names inside other payloads (a URDF in `robot_description`, for example) are not rewritten; consumers of merged TF that also load the URDF should apply their own frame prefix there, which is standard rviz/state-publisher practice.
