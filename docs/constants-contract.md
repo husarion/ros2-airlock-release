@@ -77,8 +77,9 @@ The image build refuses a file that differs from the binary's output or that say
 | `api.max_request_bytes_default` | integer | `api.max_request_bytes`, the longest request line, when the block sets none. |
 | `api.max_sample_bytes_default` | integer | `api.max_sample_bytes`, the largest rendered sample or graph reply, when the block sets none. |
 | `api.max_raw_sample_bytes_default` | integer | `api.max_raw_sample_bytes`, the largest sample the reader takes, when the block sets none. |
-| `api.rate_defaults` | object | The token buckets when the block sets none: `samples`, `calls` and `graph`, each `{per_s, burst}`. |
+| `api.rate_defaults` | object | The token buckets when the block sets none: `samples`, `calls` and `graph`, each `{per_s, burst}`; since 1.27.0 every admitted uid has its own set at these rates. |
 | `api.ledger` | object | The call ledger per callable service: `ids` remembered, `outcomes` kept and `keep_s`, how long an outcome is kept. |
 | `api.sample_schema` | integer | The version of a sample reply's document. |
 | `api.call_schema` | integer | The version of a call reply's document (`schema/api_call.schema.json`). |
 | `api.retain_max` | integer | The most lanes `api.retain` may name (1.26.1): each keeps one standing reader in the half's world. |
+| `api.uid_idle_drop_s` | integer | How long a uid may hold no connection before its token buckets are dropped (1.27.0: every admitted uid has its own buckets, re-created full at its next request). |
