@@ -248,7 +248,7 @@ An `rx` row's `rt` is the destination pump's real-time state (1.25.0):
 - null # no airlock.rt in the file, or not a control lane
 ```
 
-Beside it: `rt_batch` (the frames one wake may take), `rt_run_max_us` (the longest CPU time one wake took), `rt_frames_max` (the most frames taken between two waits), `rt_wakes` and `events_dropped` (records the pump's event ring could not hold; its violations are still counted). The half-wide record is `process.rt` (`requested`, `applied`, `eligible_threads`, `applied_threads`, `error`, `rtprio_limit`), and `airlock doctor` reports a refusal as `process.rt_refused`. See [threads and pinning](threads-and-pinning.md).
+Beside it: `rt_batch` (the frames one wake may take), `rt_run_max_us` (the longest CPU time one wake took), `rt_frames_max` (the most frames taken between two waits), `rt_wakes` and `events_dropped` (records the pump's event ring could not hold; its violations are still counted). The half-wide record is `process.rt` (`requested`, `applied`, `reason`, `eligible_threads`, `applied_threads`, `error`, `rtprio_limit`). `applied` is null when no eligible pump runs. `reason` (1.27.1) is `not_requested`, `no_eligible_pump` (asked for, with no running control pump to apply it to: no control lane into this world, or every one idle), `applied`, `refused:<errno>` (`refused:EPERM`) or `partial`. `airlock doctor` reports a refusal as `process.rt_refused` and the `no_eligible_pump` case as the information `process.rt_no_eligible_pump`. See [threads and pinning](threads-and-pinning.md).
 
 ### Services
 

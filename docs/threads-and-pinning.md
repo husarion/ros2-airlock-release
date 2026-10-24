@@ -103,11 +103,11 @@ When the call is refused, the half logs it once at WARN with the error and the l
 
 ```json
 "process": {"uid": 10001, "gid": 10001, "caps_effective": [], "fds": 40, "fd_limit": 1048576,
-  "rt": {"requested": 5, "applied": 0, "eligible_threads": 2, "applied_threads": 0,
-         "error": "EPERM (Operation not permitted)", "rtprio_limit": 0}}
+  "rt": {"requested": 5, "applied": 0, "reason": "refused:EPERM", "eligible_threads": 2,
+         "applied_threads": 0, "error": "EPERM (Operation not permitted)", "rtprio_limit": 0}}
 ```
 
-`applied` is the priority when every eligible pump runs at it, and 0 otherwise. `airlock doctor` reports `process.rt_refused` with the fix. Each `rx` row carries `rt` (`fifo:5`, `refused`, `ineligible:max_bytes`, or null for a lane that is not real-time), `rt_batch`, and two figures from the pump itself: `rt_run_max_us`, the longest stretch of CPU time it spent in one wake, and `rt_frames_max`, the most frames it took between two waits (at most `pump_batch`). `chrt -p <tid>` shows the policy from outside; the tids are in the status's `threads` list.
+`applied` is the priority when every eligible pump runs at it, 0 when some do not, and null when no eligible pump runs at all. `reason` (engine 1.27.1) says which case it is: `not_requested` (no `airlock.rt`), `no_eligible_pump` (the priority is asked for but no control pump runs to apply it to: the half delivers no control lane into its world, or every one is idle, since a lazy lane nobody subscribes to has no pump), `applied`, `refused:<errno>` (no pump got it, `refused:EPERM` for the missing ulimit) or `partial` (some pumps run at it, the rest were refused or have not applied it yet). `airlock doctor` reports `process.rt_refused` with the fix, and `process.rt_no_eligible_pump` as information: nothing is wrong, the priority is applied when such a pump starts. Each `rx` row carries `rt` (`fifo:5`, `refused`, `ineligible:max_bytes`, or null for a lane that is not real-time), `rt_batch`, and two figures from the pump itself: `rt_run_max_us`, the longest stretch of CPU time it spent in one wake, and `rt_frames_max`, the most frames it took between two waits (at most `pump_batch`). `chrt -p <tid>` shows the policy from outside; the tids are in the status's `threads` list.
 
 ### Sharing CPUs with normal work
 
