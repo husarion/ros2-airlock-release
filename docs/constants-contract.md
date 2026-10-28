@@ -12,8 +12,8 @@ Every image carries the same bytes as a file and names the contract in two label
 | `com.husarion.airlock.constants.path` | `/opt/ros2_airlock/share/ros2_airlock/constants.json` |
 
 ```bash
-docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.25.0-jazzy
-id=$(docker create husarion/ros2-airlock:1.25.0-jazzy)
+docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.27.1-jazzy
+id=$(docker create husarion/ros2-airlock:1.27.1-jazzy)
 docker cp "$id:/opt/ros2_airlock/share/ros2_airlock/constants.json" - | tar -xO
 docker rm "$id"
 ```

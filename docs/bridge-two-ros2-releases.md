@@ -2,13 +2,13 @@
 
 Your robot runs Jazzy and your fleet still runs Humble, or your fleet moved to Lyrical before the robot did. One airlock joins them: its robot half runs on the robot's release, its fleet half on the fleet's, and the message types that changed between the two releases are converted field by field on the way through. Nothing changes in the config file: it names topics and types, never a release.
 
-The airlock ships one image and one deb per release, all from one engine version:
+The airlock ships one image and one deb per release, all from one engine version (1.27.1 at the time of writing, the version the examples below use; run the same version on both halves):
 
 | Release | Docker image | Deb |
 | -- | -- | -- |
-| Jazzy | `husarion/ros2-airlock:1.22.0-jazzy` (also `:latest-jazzy`) | `ros-jazzy-ros2-airlock` |
-| Humble | `husarion/ros2-airlock:1.22.0-humble` | `ros-humble-ros2-airlock` |
-| Lyrical | `husarion/ros2-airlock:1.22.0-lyrical` | `ros-lyrical-ros2-airlock` |
+| Jazzy | `husarion/ros2-airlock:1.27.1-jazzy` (also `:latest-jazzy`) | `ros-jazzy-ros2-airlock` |
+| Humble | `husarion/ros2-airlock:1.27.1-humble` | `ros-humble-ros2-airlock` |
+| Lyrical | `husarion/ros2-airlock:1.27.1-lyrical` | `ros-lyrical-ros2-airlock` |
 
 A cross-release pair is two containers from two of these images, sharing an IPC namespace and a volume. Save the config from [Bridge your first topic](bridge-your-first-topic.md) as `airlock.yaml` with one more topic, the one whose definition changed on Lyrical:
 
@@ -38,7 +38,7 @@ services:
     shm_size: 512mb
 
   airlock_robot:                # the robot's release
-    image: husarion/ros2-airlock:1.22.0-jazzy
+    image: husarion/ros2-airlock:1.27.1-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     volumes:
@@ -47,7 +47,7 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world robot -c /etc/airlock/airlock.yaml"]
 
   airlock_fleet:                # the fleet's release
-    image: husarion/ros2-airlock:1.22.0-lyrical
+    image: husarion/ros2-airlock:1.27.1-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     volumes:
@@ -56,13 +56,13 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world fleet -c /etc/airlock/airlock.yaml"]
 
   talker:                       # stands in for your robot: same image as its half
-    image: husarion/ros2-airlock:1.22.0-jazzy
+    image: husarion/ros2-airlock:1.27.1-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && ros2 topic pub -r 2 /transition_event lifecycle_msgs/msg/TransitionEvent '{timestamp: 12345000000, transition: {id: 3, label: activate}}' >/dev/null & exec ros2 topic pub -r 2 /chatter std_msgs/String 'data: hello through the airlock'"]
 
   listener:                     # stands in for your fleet tools: same image as the fleet half
-    image: husarion/ros2-airlock:1.22.0-lyrical
+    image: husarion/ros2-airlock:1.27.1-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec ros2 topic echo /my_robot/chatter std_msgs/msg/String"]
@@ -87,7 +87,7 @@ docker compose exec airlock_fleet bash -c 'source /opt/ros/$ROS_DISTRO/setup.bas
 ```
 
 ```text
-== definitions (proto 1.6) ==
+== definitions (type identity across the wall) ==
   ok [fleet] 1 lane(s) run CONVERTED on the fleet half (field-level, SPEC-CROSS-RELEASE §5): /my_robot/transition_event
 == channels ==
   ok [robot] /chatter -> /my_robot/chatter: flowing
@@ -99,7 +99,7 @@ Every topic, service and action the config names ends in one of four states, and
 - **same.** Both halves hold the same definition of the type. The bytes cross untouched, exactly as on a single-release pair. Most types are `same` between any two releases: of the 563 types both the Humble and the Jazzy image carry, 513 are identical.
 - **converted.** The definitions differ and one half, the fleet half by default, rewrites each message into the other definition. A field added in the newer release is filled with its default on the way to the older one and dropped on the way back; a renamed field or a changed unit needs a rule, and the image ships rules for the types that changed this way among those Husarion robots expose (the controller manager's services, the lifecycle transition event). The status file lists the dropped and defaulted fields and the rule per lane, and the doctor prints the lane. Conversion costs microseconds per message and runs on the half that is not the `ipc.listener`, the fleet half in every example here, so the robot's side never pays for it.
 - **refused.** The definitions differ in a way the airlock will not guess about: a field changed its type or array size, a service or an action (which always need an explicit rule), or an entry you marked `protected` or `convert: deny`. A refused lane is absent from the destination world, and the doctor prints why and what fixes it, with a ready-to-paste rule when a rule is the fix. [Write a type rule](write-a-type-rule.md) walks through that.
-- **unchecked.** The other half runs an engine older than 1.18.0, which cannot describe its types; unprotected topics cross as they always did and protected ones are refused. Upgrade both halves and this state goes away.
+- **unchecked.** The state the status reference keeps for a peer engine older than 1.18.0, which cannot describe its types. A half refuses any peer older than 1.24.0 when the session starts, so you will not see it on a supported pair: nothing crosses until both halves run a supported engine.
 
 Topics that merely gained or lost a field convert automatically. Services and actions convert only under a rule that acknowledges every dropped or defaulted field, because a request silently missing a parameter is worse than a service that is visibly absent. You can tighten a topic the same way with `convert: explicit`, or forbid conversion outright with `convert: deny` (both are keys of every entry).
 
@@ -115,7 +115,7 @@ The image ships its rules in `/opt/ros2_airlock/share/ros2_airlock/type_map.d/`;
 
 ## On Husarion robots
 
-On Panther and Lynx the robot half runs on the robot's release and Husarion Cockpit will offer the fleet half's release next to the RMW and domain selection on the Network tab, with a live line showing how many topics are the same, converted or refused for that choice. Until then the same switch is a change of the fleet half's image tag in the deployment.
+On Panther and Lynx the robot half runs on the robot's release, and Husarion Cockpit offers the fleet half's release as a select in the network settings, next to the RMW and the domain. It lists the releases whose images the robot carries and shows a live line under the field with how many topics are the same, converted or refused for that choice. An apply is checked first and reverts on its own when the new release does not carry the protected lanes. Outside Cockpit the same switch is a change of the fleet half's image tag in the deployment.
 
 ## Next
 

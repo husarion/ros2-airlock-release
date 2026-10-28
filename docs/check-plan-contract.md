@@ -20,7 +20,7 @@ The file of [bounded bulk lanes](bounded-bulk-lanes.md), planned; the notes are 
 ```json
 {
   "schema": 1,
-  "engine_version": "1.26.0",
+  "engine_version": "1.27.1",
   "config_schema": 9,
   "file": "airlock.yaml",
   "verdict": "ok",

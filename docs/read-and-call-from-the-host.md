@@ -102,6 +102,31 @@ A `calls` item may be `{service: <name>, request: <the request's fields>}`, and 
 
 The rate limits under `api.rate` apply to each uid on its own: a tool running as one uid that spends its budget is refused `rate`, while the watchdog running as root still gets its full budget. A uid that has held no connection for 60 seconds starts with a full budget again. The status lists every uid with its tokens and refusals under `api.uids`.
 
+## Every key of the `api:` block
+
+Each world may carry its own `api:` block under `worlds.<world>`; the half of that world serves it. `airlock_half --constants` prints the defaults under `api` ([constants contract](constants-contract.md)).
+
+| Key | Default | Meaning |
+| -- | -- | -- |
+| `socket` | none, required | Absolute path of the socket, at most 107 bytes with a file name of at most 72. Its directory must exist, belong to the half's uid or root and be writable by nobody else. |
+| `allow_uids` | `[]` | Up to 16 uids that get the whole block, as root does. |
+| `trust_own_uid` | `false` | Gives the half's own uid the whole block too; `check` warns about it on the listener. |
+| `samples` | `carried` | What a sample may read. `carried` admits every lane the half holds: each topic a direction from this world carries (an exact entry or a name one of its globs admits) and, from 1.27.0, each destination name a direction into this world delivers. A list of exact names admits only those, and each must be such a lane. |
+| `calls` | `[]` (nothing callable) | Exact service names the host may call: a service entry of a direction from this world (its server lives here) or an `api.local.services` name. An item may be `{service: <name>, request: <fields>}` to fix the request (1.27.0). Actions and globs are not callable. |
+| `retain` | `[]` | Up to 16 exact topic names, each with a standing reader for the half's whole run, so a sample costs the world nothing (1.26.1). Each must be sampleable and its entry's `max_bytes` within `max_raw_sample_bytes`. |
+| `local.services` | `[]` | Services the host may call that the wall does not carry in this world. Each takes the service entry's keys `service`, `type` (required), `timeout_s`, `max_request_bytes`, `max_response_bytes`, `max_inflight`, `finite`, an optional fixed `request`, and a required `purpose` of up to 255 printable bytes, which doctor and the audit print. |
+| `local.topics` | `[]` | Topics the host may sample that the wall does not carry in this world: `topic`, `type` (required, since no lane discovers it), an optional `max_bytes` and the required `purpose`. Only the uids that get the whole block reach them. |
+| `max_connections` | 4 (1 to 16) | Connections at once; one slot is kept for root. |
+| `max_inflight` | 2 (1 to 8) | Calls in flight across the surface; the next one is refused `inflight`. |
+| `max_request_bytes` | 65536 (1024 to 1 MiB) | The longest request line; a longer one is refused `size`. |
+| `max_sample_bytes` | 1048576 (4096 to 16 MiB) | The rendered reply of a sample or a graph; past it the reply is cut at an element boundary and marked `truncated`. A request's `max_bytes` may lower it. |
+| `max_raw_sample_bytes` | 4194304 (4096 to 64 MiB) | The reader's buffer for one serialized message: a lane whose `max_bytes` is larger answers `size`. |
+| `rate.samples` | `{per_s: 5, burst: 10}` | Token bucket for samples, per admitted uid (1.27.0). `per_s` 1 to 1000, `burst` at least `per_s` and at most 1000. |
+| `rate.calls` | `{per_s: 2, burst: 4}` | The same for calls. |
+| `rate.graph` | `{per_s: 10, burst: 10}` | The same for `graph`. |
+
+A name under `api.local` must be one the wall does not touch in this world, neither carried out of it nor delivered into it, so a local entry can never become a way across the wall that the directions do not name.
+
 ## The verbs and the native client
 
 `ros2 airlock sample <topic>`, `ros2 airlock call <service>` and `ros2 airlock graph` take the socket from the config (`-c`, or `AIRLOCK_CONFIG`, or the `-c` of a half running beside them) or from `--socket`, never from a status file: another process of the half's uid can write a status file and point a reader somewhere else. The name is the one in the half's own world: a source name, or the destination name of a lane delivered into it.
@@ -109,7 +134,7 @@ The rate limits under `api.rate` apply to each uid on its own: a tool running as
 From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file:
 
 ```bash
-v=1.27.0; a=arm64
+v=1.27.1; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api

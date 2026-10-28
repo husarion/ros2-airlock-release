@@ -78,7 +78,7 @@ complete | robot->fleet: 2 items, 1 glob
 
 One row per topic, service and action, sorted by direction and name: the name on both sides, the type, the lane's class, the lane state, the service channel (`released` until the first call, then `armed`), the rate, the caps and the entry that carries it, an exact one or a glob with its file. With a glob in the file the config no longer lists what is bridged, so this is the page to read. Since 1.26.0 the `host read` column marks a topic the host sampled through the half's socket within the last status period, and every `api.local` name of a half is a row of its own carried by `local`, with that half's evidence alone (`robot->host`): the host can reach it, the wall never carries it. It is built only from the halves' status files and the running config: it starts no ROS participant and opens no socket. The listener's status is the authority; a row that only the connector's status vouches for reads `unverified`, its evidence column carries a `*` and its names are printed in quotes.
 
-`--format json` prints the document of `schema/api.schema.json` (schema 1), the one the Cockpit's live API page relays. `--direction robot->fleet` and `--kind topic|service|action` filter, `--all` also lists config entries that carry nothing right now (`unmatched`), and `--single-sample` reads once and prints no rates (by default it waits for the next status write, up to three intervals, and takes the rate from the counters). The exit code is 0 when the picture is complete, 3 when it is not: one half has written no status for 15 s or is missing (the other half's rows are printed with `evidence: robot_only` or `fleet_only`), names were left out because a glob hit `max_lanes`, or rows were dropped as malformed. It is 2 when nothing can be read, when the file on disk is no longer the one the halves run (edit and reload first), or when a half is older than 1.24.0 and writes no lane carriers. On 2 and 3 the JSON is still printed, with `complete: false` and the reasons in `problems[]`.
+`--format json` prints the document of `schema/api.schema.json` (schema 1), the one the Cockpit's live API page relays. `--direction robot->fleet` and `--kind topic|service|action` filter, `--all` also lists config entries that carry nothing right now (`unmatched`), and `--single-sample` reads once and prints no rates (by default it waits for the next status write, up to three intervals, and takes the rate from the counters). The exit code is 0 when the picture is complete, 3 when it is not: one half has written no status for 15 s or is missing (the other half's rows are printed with `evidence: robot_only` or `fleet_only`), names were left out because a glob hit `max_lanes`, or rows were dropped as malformed. It is 2 when nothing can be read, when the file on disk is no longer the one the halves run (edit and reload first), or when a status file carries no lane carriers (an engine older than 1.24.0 wrote none; a supported pair always does). On 2 and 3 the JSON is still printed, with `complete: false` and the reasons in `problems[]`.
 
 ## `check --dry-run`: what would this change do?
 
@@ -128,7 +128,7 @@ ros2 airlock history --since 14:00
 ```
 
 ```text
-2026-09-27 19:22:23 [robot] peer_connected lane="" count=1 peer_world="fleet" proto_minor=6 epoch_matched=True
+2026-09-27 19:22:23 [robot] peer_connected lane="" count=1 peer_world="fleet" proto_minor=9 epoch_matched=True
 2026-09-27 19:23:02 [robot] lane_state lane="/robot/chatter" count=1 role="tx" from="advertised" to="flowing"
 2026-09-27 19:23:16 [robot] trial_added entry_kind="topic" direction="robot->fleet" name="/odometry/filtered" deadline="2026-09-27T19:25:15Z"
 2026-09-27 19:23:16 [robot] reload_applied epoch="87730946423c4af5"
@@ -162,3 +162,19 @@ ros2 airlock migrate airlock.yaml
 ```
 
 An engine of 1.26.0 or later reads schema 9 only and refuses an older file, naming this command. `migrate` reads any schema from 1 to 8 and writes `airlock.schema9.yaml` beside your file (`--in-place` keeps a `.bak`), prints one line per change and the shared memory the new file reserves, and runs `check` on the result. A schema 8 file only gets its version line changed. From an older file it also writes `class: bulk` and the 4 MiB/s cap on every camera-sized entry, so you can see which lanes are capped. [Move a config to schema 9](move-a-config-to-schema-9.md) lists what it writes and what it leaves to you.
+
+## Run both halves from one command (`worlds.<w>.env`)
+
+```yaml
+  worlds:
+    robot:
+      env: { ROS_DOMAIN_ID: "17" }
+    fleet:
+      env: { ROS_DOMAIN_ID: "18", RMW_IMPLEMENTATION: rmw_cyclonedds_cpp }
+```
+
+```bash
+ros2 run ros2_airlock airlock -c airlock.yaml
+```
+
+With no verb, `airlock` is a launcher for a machine without containers: it starts one `airlock_half` per world, each with your environment plus that world's `env:` block, restarts a half that exits on its own with a backoff while the other keeps running, passes `SIGHUP` to both and stops both on `SIGTERM` or Ctrl-C. Only the launcher reads `env:`. A half started any other way, a container or a systemd unit, takes its world from its own process environment and ignores the block, so on a robot set the variables where you start each half.
