@@ -49,7 +49,7 @@ Terminal 4 prints `hello` twice a second. The message was published in domain 17
 
 **Only what you list exists.** Run `ROS_DOMAIN_ID=18 ros2 topic list` in the fleet world: you see `/my_robot/chatter` and the airlock's own node, and nothing else from the robot world. A direction is a deny-by-default allowlist; a topic not listed is absent from discovery entirely, not merely filtered.
 
-**Data flows only while someone listens.** Stop terminal 4 and the robot-side subscription is torn down; the publisher in terminal 3 is back to zero matched subscribers and does no serialization work. The topic stays advertised in the fleet world the whole time. This lazy activation is the default; entries with latched data (`durability: transient_local`) should set `activation: always` so late joiners get history.
+**Data flows only while someone listens.** Stop terminal 4 and, 1 to 2 s later, the robot-side subscription is torn down (the half checks for subscribers once a second and waits for two checks in a row to find none); the publisher in terminal 3 is back to zero matched subscribers and does no serialization work. The topic stays advertised in the fleet world the whole time. This lazy activation is the default; entries with latched data (`durability: transient_local`) should set `activation: always` so late joiners get history.
 
 The `type` line is optional. Without it, the airlock discovers the type when a publisher appears, which is what glob entries like `/camera/*` rely on. With it, a publisher with a different type is rejected instead of bridged.
 

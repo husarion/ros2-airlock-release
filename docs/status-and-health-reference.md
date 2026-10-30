@@ -30,6 +30,8 @@ Every half writes `status_<world>.json` in its `ipc.dir` every 5 seconds. This p
 
 `discovery.last_poll_s` is the other half of the question: a stalled graph loop leaves it climbing while every other field still looks fresh.
 
+`discovery.cross_check_s` is how often the half runs that second participant, in seconds: `recovery.cross_check_s` when the config sets it, otherwise the default of the half's RMW, 3600 on `rmw_zenoh_cpp` and 300 on every other, and `AIRLOCK_CROSS_CHECK_S` over both (0 means disabled). On Zenoh the default is an hour because each cross-check opens a Zenoh session, and zenoh-c 1.8.0 keeps about 25 KB of every session it closes, so at 300 s a half would grow by about 7 MB a day; at 3600 s that is about 0.6 MB. Set `cross_check_s` yourself to choose another cadence.
+
 `discovery.cross_check.verdict` is the second participant's word on what the half's own participant misses:
 
 ```yaml
@@ -134,6 +136,8 @@ Each `tx` row is a lane this half takes from its world and sends through the wal
 | `stalled` | Demanded, a source exists, and nothing moves. |
 | `unverified` | The row rests on the peer's word only (the listener has not confirmed it). |
 | `expired` | The entry's `expires` time has passed; the lane is closed. |
+
+An `rx` row's `demanded` says whether a consumer in this world asks for the lane: a subscriber the last demand poll found (one poll a second), or the entry is `activation: always`. A lazy lane deactivates only after two polls in a row find no subscriber (engine 1.28.0, `lazy.deactivate_after_polls` in the [constants](constants-contract.md)), so for the one poll between them the row reads `demanded: false` while its `state` still says the lane flows. For that poll a listener does not grade the row `unverified` and it carries no `demanded_silent` reason, since both apply only to a demanded lane. A lane deactivates 1 to 2 s after its last subscriber leaves, and up to 2 s later while a host sample reader that has just been released is still matched.
 
 The source half's own word for an `rx` lane, from its last report:
 
@@ -420,6 +424,7 @@ The `call` operation (1.26.0) counts every outcome under `api.calls`: `served` (
 # status: api.clients[].origin
 - wall
 - local
+- action
 ```
 
 ```yaml
@@ -438,7 +443,52 @@ A lane listed in `api.retain` (1.26.1) has a standing reader the half keeps for 
 - blind
 ```
 
-`waiting` has no reader yet: no publisher of the lane is discovered, or its type is not known yet. `none` has a reader and no message yet; a sample then waits for the first up to its `wait_s` and answers `no_publisher` or `timeout` when none comes, never an older value. `held` holds the newest message. `blind` is a reader a participant rebuild tore down that is not back yet; a sample answers `blind`.
+`waiting` has no reader yet: no publisher of the lane is discovered, or its type is not known yet. `none` has a reader and no message yet; a sample then waits for the first up to its `wait_s` and answers `no_publisher` or `timeout` when none comes, never an older value. `held` holds the newest message. `blind` is a reader a participant rebuild tore down that is not back yet; a sample answers `blind`. From 1.28.0 `api.retain` may also name an `api.local.topics` name, whose row reads the same way.
+
+A watch (1.28.0) is a connection that streams the updates of retained lanes. Once its first line is read it no longer counts under `connections` (nor `peak_connections`, nor `airlock_api_connections`): it holds one of `api.max_watchers` instead, so `connections` counts request connections only. `api.requests.watch` counts the watch requests, `api.refused.watchers` the ones refused because every watch slot was taken. `api.watchers[]` lists every open watch: the peer's `uid`, the `names` it watches, the `updates`, `coalesced` takes and `keepalives` it was sent, and `since_s`, how long it has been open. `api.watch` holds the counters:
+
+- `open`, the watches open now, and `opened`, every watch opened since the half started;
+- `refused`, the watches refused at open by code: `not_watchable` (a name not in `api.retain`), `watchers` (every slot taken), `scope` (an `api.local` name for a uid with the wall's scope only), `invalid_request`, `rate` and `internal`;
+- `updates`, the update lines sent, and `coalesced`, the takes they did not carry; `keepalives`;
+- `stalled`, the watches closed because their client stopped reading (bytes left unread for 3 x `api.watch.keepalive_s`, the kernel's count of them), each one written to the audit file `api_<world>.jsonl` with `kind: watch`;
+- `closed`, how every watch ended: `eof` (the client closed it), `stalled`, `size` (the client sent more than `api.max_request_bytes` without a newline, or more than 64 lines, or `api.max_request_bytes` of them, on the watch), `teardown` (the half stopped, or its `api:` block went) and `reload` (a reload took a watched name out of `api.retain`);
+- `discarded_lines`, the request lines clients sent on an open watch, which the half reads and ignores;
+- `last_stalled`, the newest stall (its `uid`, `names`, `age_s` and `count`), null when there was none; `airlock doctor` reports one in the last 5 minutes as `api.watch_stalled`.
+
+`/metrics` carries `airlock_api_watchers` (the open watches) and `airlock_api_watch_updates_total{name}`, and `airlock_api_requests_total` an `op="watch"` series. The history ring records an `api_watch` event when a watch opens and when it closes, coalesced per uid per minute.
+
+A host goal (1.28.0) is a connection whose first line is an `action_goal`: like a watch it leaves `connections` once that line is read and holds one of `api.max_goals` instead (`api.refused.goals` counts the goals refused because every slot was taken; `api.refused.goal_busy` the goals refused because their action already had one). `api.requests.action_goal` and `api.requests.action_cancel` count the requests. `api.actions[]` lists every action of `api.actions`, in its order: its `type`, `origin` (`wall` or `local`), `state` (`idle`; `active`, a host goal holds the action's one slot; `canceling`, the half asked its cancel; `recovering`, a goal a killed run left open is being cancelled at this start and no new goal is accepted until that is done), the active goal's `goal_id` and `owner_uid` (null when idle), and `goals`, every goal by outcome: `succeeded`, `aborted`, `canceled`, `timeout` (its `max_duration_s` ran out and the half cancelled it), `lost` (no server, or no status of it, for `lost_after_s`; or the server did not answer the goal or its cancel), `rejected`, `canceled_on_disconnect` (its client went and the cancel that caused ended it), `canceled_at_start`, `cancel_failed` (a cancel answered `rejected` or `unknown_goal`, or not answered within `timeout_s`; the goal stays tracked), and `send_failed` (a stopping half cancels its goals and leaves their audit trail open for the next start, so no outcome is counted for them). `api.goals` holds the counters:
+
+- `open`, the goal streams open now, and `opened`, every goal the half went on to send since it started;
+- `refused`, the goals refused at open by code: `goal_busy`, `not_allowed` (an unlisted action, a uid the entry does not admit, a fixed goal or a goal constraint), `invalid_request`, `rate`, `blind`, `type_unsupported` and `internal`;
+- `duplicates`, the retried request ids answered with their first goal;
+- `cancels`, the cancel requests the half sent (on a disconnect, a timeout, a host cancel, a stop, a rebuild, a start);
+- `last_cancel_failed`, the newest cancel that failed (its `action`, `goal_id`, `reason` `rejected`, `unknown_goal`, `unanswered` or `no_server`, `age_s` and `count`), null when none did; `airlock doctor` reports one in the last 5 minutes as `api.action_cancel_failed`;
+- `last_lost`, the newest goal lost (its `action`, `goal_id`, `cause`, `age_s` and `count`); `airlock doctor` reports one in the last 5 minutes as `api.action_lost`.
+
+```yaml
+# status: api.actions[].origin
+- wall
+- local
+```
+
+```yaml
+# status: api.actions[].state
+- idle
+- active
+- canceling
+- recovering
+```
+
+```yaml
+# status: api.goals.last_cancel_failed.reason
+- rejected
+- unknown_goal
+- unanswered
+- no_server
+```
+
+`api.clients[]` lists the half's client of each action's `_action/cancel_goal` with `origin: action`. Every goal writes to the audit file `api_<world>.jsonl` with `kind: action` (the call lines carry `kind: call` since 1.28.0): `goal_sent` before the goal leaves, `accepted`, `cancel_sent` with its reason, `cancel_response` with the server's return code, and `terminal` with the outcome; a half reads the file at its start and cancels every goal it shows sent and not ended. `/metrics` carries `airlock_api_action_active{action}` (1 while a host goal holds the action) and `airlock_api_action_goals_total{action,outcome}`, and `airlock_api_requests_total` the `op="action_goal"` and `op="action_cancel"` series. The history ring records an `api_action` event when a goal opens, is refused or ends, coalesced per action per minute.
 
 ## The rest of the file
 

@@ -29,6 +29,7 @@ Each page below is one task and starts with a working snippet:
 16. [The constants contract](constants-contract.md): `airlock_half --constants`, the file and labels every image carries, and the rule for changing it.
 17. [The check plan contract](check-plan-contract.md): `ros2 airlock check <file> --plan --format json`, every entry's class, cap and real-time policy as one document a tool can read before a file is applied.
 18. [Read and call the robot from the host](read-and-call-from-the-host.md): `ros2 airlock sample` and `call` ask the half already in the robot's world through a local socket, instead of starting a participant per read; who may ask, the fallback rule, and status and forensics directories of each half's own.
+19. [Verify the images](verify-images.md): check the cosign signature of an image, its SBOM and the static `airlock_api` binary against Husarion's public key before you deploy them.
 
 Configuration reference: every config key is machine-validated by [`airlock.schema.json`](https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json). Put the `yaml-language-server` header from the snippets in your own files and your editor autocompletes and validates as you type. `ros2 run ros2_airlock airlock check <file>` validates offline and explains every error with the rule and the fix. The normative specification and the research behind it are mapped in [`docs/INDEX.md`](../INDEX.md).
 

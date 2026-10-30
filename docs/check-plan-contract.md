@@ -5,7 +5,10 @@
 ```bash
 ros2 airlock check airlock.yaml --plan --format json      # the check and every entry
 ros2 airlock check airlock.yaml --format json             # the check alone, no entries
+ros2 airlock check airlock.yaml --world fleet --format json   # the check for the fleet half
 ```
+
+`--world <world>` names the half the check is for. It matters on a Humble image only: there `api.actions` is refused (an error) in the named world's `api:` block, and every other world's block, or every block when no `--world` is given, is reported as the note `api.actions_humble`, because a Humble half refuses its own world's block when it starts while a Jazzy or Lyrical half of the other world serves its block. A `--world` that is no world of the file is an error.
 
 The engine prints the document itself (`airlock_half --check --classes --format json -c <file>`), with the classifier the running halves use, so the values are the ones the status rows carry for the same file: `class`, `class_reason` and `cap_bytes_per_s` on the `tx` and `rx` rows of both halves, and `rt` on the destination half's `rx` rows (see the [status and health reference](status-and-health-reference.md)). A view made before applying a file and the view of the running pair agree. The one value only a running half can show is a live promotion (`class_reason: observed`), and the one `rt` value only a running half can earn is `refused`.
 
@@ -204,6 +207,28 @@ The file of [bounded bulk lanes](bounded-bulk-lanes.md), planned; the notes are 
 | `entries[].max_response_bytes` | integer | Services and actions: the response cap. |
 | `entries[].max_inflight` | integer | Services and actions: requests in flight. |
 | `entries[].pinned` | boolean | Services and actions: the channels open at advertise (a protected entry, or a timeout under 0.5 s); a glob's never do. |
+| `watchable` | array | With `--plan` only (1.28.0): every name a host `watch` may follow, one per `api.retain` name of a world's `api:` block, in the block's order. |
+| `watchable[].world` | string | The world whose half serves the watch. |
+| `watchable[].topic` | string | The name, as `api.retain` lists it. |
+| `watchable[].origin` | string | `wall` (a lane the wall carries from that world or delivers into it) or `local` (an `api.local.topics` name the wall does not carry). |
+| `watchable[].type` | string or null | The type as the file states it; null for an entry that states none (the half learns it when the lane exists). |
+| `watchable[].max_hz` | integer | `api.watch.max_hz`: updates a second per watched name at most. |
+| `watchable[].keepalive_s` | number | `api.watch.keepalive_s`: a keepalive after this long without a line. |
+| `watchable[].max_watchers` | integer | `api.max_watchers`: the watch streams the half serves at once, one of them reserved for uid 0. |
+| `action_targets` | array | With `--plan` only (1.28.0): every action a host goal may drive, one per `api.actions` entry of a world's `api:` block, in the block's order. |
+| `action_targets[].world` | string | The world whose half serves the goal. |
+| `action_targets[].action` | string | The action's name in that world. |
+| `action_targets[].origin` | string | `wall` (an exact action entry of a direction from that world) or `local` (an action the wall does not carry). |
+| `action_targets[].type` | string or null | `pkg/action/Name`: the local entry's, or the wall entry's. |
+| `action_targets[].uids` | array | The uids that may drive it: 0 first, then the entry's `allow_uids`. |
+| `action_targets[].fixed_goal` | object or null | The entry's fixed `goal`; null when it has none. |
+| `action_targets[].goal_constraints` | object | The entry's `goal_constraints`, field path to value; empty when it has none. |
+| `action_targets[].max_duration_s` | number | When a host goal is cancelled and its stream ends `timeout`. |
+| `action_targets[].accept_timeout_s` | number | The server's goal response within this. |
+| `action_targets[].timeout_s` | number | A cancel's response, and the result after a terminal status, within this. |
+| `action_targets[].lost_after_s` | number | A goal with no server, or absent from its status, this long is lost. |
+| `action_targets[].feedback_max_hz` | integer | `api.actions_feedback_max_hz` of the block. |
+| `action_targets[].max_goals` | integer | `api.max_goals` of the block. |
 
 ## The value lists
 
@@ -277,4 +302,18 @@ The verdict behind it:
 - not_control
 - ineligible:max_bytes
 - null
+```
+
+Where a watchable name comes from:
+
+```yaml
+# check_plan: watchable[].origin
+- wall
+- local
+```
+
+```yaml
+# check_plan: action_targets[].origin
+- wall
+- local
 ```

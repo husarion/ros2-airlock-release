@@ -12,8 +12,8 @@ Every image carries the same bytes as a file and names the contract in two label
 | `com.husarion.airlock.constants.path` | `/opt/ros2_airlock/share/ros2_airlock/constants.json` |
 
 ```bash
-docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.27.1-jazzy
-id=$(docker create husarion/ros2-airlock:1.27.1-jazzy)
+docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.28.0-jazzy
+id=$(docker create husarion/ros2-airlock:1.28.0-jazzy)
 docker cp "$id:/opt/ros2_airlock/share/ros2_airlock/constants.json" - | tar -xO
 docker rm "$id"
 ```
@@ -83,3 +83,14 @@ The image build refuses a file that differs from the binary's output or that say
 | `api.call_schema` | integer | The version of a call reply's document (`schema/api_call.schema.json`). |
 | `api.retain_max` | integer | The most lanes `api.retain` may name (1.26.1): each keeps one standing reader in the half's world. |
 | `api.uid_idle_drop_s` | integer | How long a uid may hold no connection before its token buckets are dropped (1.27.0: every admitted uid has its own buckets, re-created full at its next request). |
+| `api.watch_schema` | integer | The version of a watch stream's lines (1.28.0, `schema/api_watch.schema.json`). |
+| `api.max_watchers_default` | integer | 4: the open watch streams a half serves when `api.max_watchers` is unset; one of them is reserved for uid 0. |
+| `api.max_watch_names_default` | integer | 8: the names one watch may carry when `api.max_watch_names` is unset. |
+| `api.watch_defaults` | object | The defaults of `api.watch`: `max_hz` (10, updates a second per watched name), `keepalive_s` (1, a keepalive after this long without a line; a client that sees no line for 3 x keepalive_s treats the half as gone) and `max_updates_per_s` (200, the half-wide render budget). |
+| `api.action_schema` | integer | The version of a goal stream's lines and the cancel reply (1.28.0, `schema/api_action.schema.json`). |
+| `api.max_goals_default` | integer | 2: the open goal streams a half serves when `api.max_goals` is unset; one of them is reserved for uid 0. |
+| `api.actions_feedback_max_hz_default` | integer | 5: the feedback lines a second per goal stream when `api.actions_feedback_max_hz` is unset. |
+| `api.actions_max` | integer | 16: the most entries `api.actions` may list. |
+| `api.action_defaults` | object | The defaults of an `api.actions` entry: `accept_timeout_s` (5), `timeout_s` (2) and `lost_after_s` (10); `max_duration_s` has none, it is required. |
+| `lazy` | object | How a lazy lane delivered into a half's world follows its demand (1.28.0). An engine constant, not a config key. |
+| `lazy.deactivate_after_polls` | integer | 2: the consecutive demand polls, 1 s apart, that must find no subscriber before the lane deactivates; a poll that finds one resets the count. A lane deactivates 1 to 2 s after its last subscriber leaves. |
