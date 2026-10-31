@@ -2,13 +2,13 @@
 
 Your robot runs Jazzy and your fleet still runs Humble, or your fleet moved to Lyrical before the robot did. One airlock joins them: its robot half runs on the robot's release, its fleet half on the fleet's, and the message types that changed between the two releases are converted field by field on the way through. Nothing changes in the config file: it names topics and types, never a release.
 
-The airlock ships one image and one deb per release, all from one engine version (1.27.1 at the time of writing, the version the examples below use; run the same version on both halves):
+The airlock ships one image and one deb per release, all built from one engine version. The examples below name the release this guide comes with; run the same version on both halves:
 
 | Release | Docker image | Deb |
 | -- | -- | -- |
-| Jazzy | `husarion/ros2-airlock:1.28.0-jazzy` (also `:latest-jazzy`) | `ros-jazzy-ros2-airlock` |
-| Humble | `husarion/ros2-airlock:1.28.0-humble` | `ros-humble-ros2-airlock` |
-| Lyrical | `husarion/ros2-airlock:1.28.0-lyrical` | `ros-lyrical-ros2-airlock` |
+| Jazzy | `husarion/ros2-airlock:1.28.1-jazzy` (also `:latest-jazzy`) | `ros-jazzy-ros2-airlock` |
+| Humble | `husarion/ros2-airlock:1.28.1-humble` | `ros-humble-ros2-airlock` |
+| Lyrical | `husarion/ros2-airlock:1.28.1-lyrical` | `ros-lyrical-ros2-airlock` |
 
 A cross-release pair is two containers from two of these images, sharing an IPC namespace and a volume. Save the config from [Bridge your first topic](bridge-your-first-topic.md) as `airlock.yaml` with one more topic, the one whose definition changed on Lyrical:
 
@@ -38,7 +38,7 @@ services:
     shm_size: 512mb
 
   airlock_robot:                # the robot's release
-    image: husarion/ros2-airlock:1.28.0-jazzy
+    image: husarion/ros2-airlock:1.28.1-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     volumes:
@@ -47,7 +47,7 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world robot -c /etc/airlock/airlock.yaml"]
 
   airlock_fleet:                # the fleet's release
-    image: husarion/ros2-airlock:1.28.0-lyrical
+    image: husarion/ros2-airlock:1.28.1-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     volumes:
@@ -56,13 +56,13 @@ services:
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec /opt/ros2_airlock/lib/ros2_airlock/airlock_half --world fleet -c /etc/airlock/airlock.yaml"]
 
   talker:                       # stands in for your robot: same image as its half
-    image: husarion/ros2-airlock:1.28.0-jazzy
+    image: husarion/ros2-airlock:1.28.1-jazzy
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "17" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && ros2 topic pub -r 2 /transition_event lifecycle_msgs/msg/TransitionEvent '{timestamp: 12345000000, transition: {id: 3, label: activate}}' >/dev/null & exec ros2 topic pub -r 2 /chatter std_msgs/String 'data: hello through the airlock'"]
 
   listener:                     # stands in for your fleet tools: same image as the fleet half
-    image: husarion/ros2-airlock:1.28.0-lyrical
+    image: husarion/ros2-airlock:1.28.1-lyrical
     ipc: service:anchor
     environment: { RMW_IMPLEMENTATION: rmw_fastrtps_cpp, ROS_DOMAIN_ID: "18" }
     command: ["bash", "-c", "source /opt/ros/$$ROS_DISTRO/setup.bash && exec ros2 topic echo /my_robot/chatter std_msgs/msg/String"]

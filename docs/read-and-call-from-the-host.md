@@ -203,10 +203,10 @@ A name under `api.local` must be one the wall does not touch in this world, neit
 
 `ros2 airlock sample <topic>`, `ros2 airlock call <service>`, `ros2 airlock graph` and (1.28.0) `ros2 airlock watch <topic>...`, `ros2 airlock action <action>` and `ros2 airlock cancel <action> <goal_id>` take the socket from the config (`-c`, or `AIRLOCK_CONFIG`, or the `-c` of a half running beside them) or from `--socket`, never from a status file: another process of the half's uid can write a status file and point a reader somewhere else. The name is the one in the half's own world: a source name, or the destination name of a lane delivered into it.
 
-From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file:
+From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file. From 1.28.1 on it is built against musl with yaml-cpp built in, so it carries no glibc and runs on any Linux of its architecture:
 
 ```bash
-v=1.27.1; a=arm64
+v=1.28.1; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api

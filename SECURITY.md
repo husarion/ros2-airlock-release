@@ -1,3 +1,5 @@
+The copy of record of this policy is `https://github.com/husarion/ros2-airlock-release/blob/main/SECURITY.md`; the source repository's `SECURITY.md` is kept identical to it by every release.
+
 # Security policy
 
 This policy covers ros2_airlock: the `husarion/ros2-airlock` Docker images, the `ros-<distro>-ros2-airlock` Debian packages and the static `airlock_api` binaries published on [husarion/ros2-airlock-release](https://github.com/husarion/ros2-airlock-release).
