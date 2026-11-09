@@ -1,0 +1,1135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json",
+  "title": "ros2_airlock configuration (schema 9)",
+  "description": "SPEC.md §4, schema 9 (docs/2026-10-17-SPEC-1.26.0.md SD2: schema 8 of docs/2026-10-13-SPEC-1.25.0.md Part C, C.5, under a new number; schema 8 was schema 7 of docs/2026-10-02-SPEC-SERVICES-AT-SCALE.md §16 plus the lane classes and byte caps): the ONLY schema an engine >= 1.26.0 reads; a file at schema 1-8 is refused at load and by `airlock check` (exit 2) naming `ros2 airlock migrate`, which rewrites it (schema/MIGRATION.md). Machine-validation contract for husarion-cockpit and editors; `airlock check` additionally enforces the semantic rules: the loop rule, world references, the listener's inbound rules (every entry into it typed, a glob into it listing `types:`, a service or action glob into it setting `max_matches`), and the standing set: every EXACT entry's channels reserved at load, (cap + 24) x (queue_depth + 3) bytes per channel plus a fixed per-channel overhead (`airlock_half --constants`), refused over ipc.shm_budget naming the entries largest first, and the exact entries' lanes (topic 1, service 1, action 5, tf 2-4) refused over airlock.max_lanes. `*` matches within one name segment and a segment that is exactly `**` matches one or more whole segments; a wildcard never matches a hidden segment or a reserved name. Every topic lane has a class, `control`, `normal` or `bulk` (an explicit `class:`; else control for /tf, /tf_static and `protected: true`; bulk for a type in share/ros2_airlock/bulk_types.yaml or <config dir>/bulk_types.d/*.yaml, or an explicit `max_bytes` at or above airlock.bulk_threshold_bytes; else normal); `airlock check --plan` prints each entry's class, reason and effective cap.",
+  "type": "object",
+  "required": [
+    "schema",
+    "airlock"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 9,
+      "description": "The one schema 1.26.0 reads. A file at 1-8 is refused naming `ros2 airlock migrate <file>`, which rewrites it in one pass (a schema 8 file as a version-line change)."
+    },
+    "airlock": {
+      "type": "object",
+      "required": [
+        "worlds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "log_level": {
+          "type": "string",
+          "description": "Schema 3 (SPEC §3.1 transport logging): iceoryx2 log level for this pair's halves, trace|debug|info|warn|error|fatal (case-insensitive). Optional; default error. Applied at load and on every applied SIGHUP reload; the AIRLOCK_LOG_LEVEL / IOX2_LOG_LEVEL env vars override it. An unrecognized VALUE is a warning, not an error — the engine degrades to the default rather than refusing the config."
+        },
+        "max_lanes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Schema 7 (services at scale SD6): the most lanes ONE half holds in every role (topic 1, service 1, an action's five parts 5, the tf block 2-4); the exact entries' lanes are reserved at load (a file whose exact entries exceed it is refused) and every glob competes for the rest. Default 512. A change needs a restart of both halves."
+        },
+        "stats_log_interval_s": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "description": "Schema 3 (SPEC §3.1 engine logging): how often each half writes its periodic per-lane statistics line at INFO, in seconds. Optional; default 0 = never. It is off by default because a container's stderr is journald PRIORITY=3 whatever severity ROS wrote it at, so this line arrives in the journal as an error: on a customer Panther the two halves produced 96% of every error-priority line of a boot and rotated the real faults out of a RAM journal. Nothing is lost — every figure on the line is in status_<world>.json and on /metrics continuously, and the line itself stays available at DEBUG (--ros-args --log-level debug). Quantised UP to the 5 s sampling tick. Applied at load and on every applied SIGHUP reload (hitless — verbosity is not part of the bridging contract); AIRLOCK_STATS_LOG_INTERVAL_S overrides it and keeps overriding it across reloads. An out-of-range or non-numeric VALUE is a warning, not an error."
+        },
+        "include_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Schema 6 (SPEC-DX §3.5): a directory of fragment files (relative paths resolve against this file's directory; conventionally <config basename>.d). The halves read <include_dir>/*.yaml in byte-wise lexical order; each is `schema: 6` plus `airlock: {directions: [...]}` and merges by the direction-union rules. At most 256 files of 1 MiB; a symlink, a group- or other-writable file or directory is refused. The epoch hashes the base and each fragment's name and bytes. Without it no fragment is ever read."
+        },
+        "managed_by": {
+          "type": "string",
+          "description": "Schema 6 (SPEC-DX §3.5): informational — the writer that owns a config without include_dir (e.g. husarion-cockpit Lanes page); the write verbs name it when they refuse."
+        },
+        "ipc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dir": {
+              "type": "string",
+              "maxLength": 94,
+              "description": "The control socket <dir>/control.sock must fit a unix socket path (107 bytes)."
+            },
+            "listener": {
+              "type": "string"
+            },
+            "queue_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "shm_budget": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_peer_minor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9,
+              "description": "The lowest peer protocol minor this half accepts (since schema 6, SPEC-HARDENING §7.2), at most the engine's own minor (9 since 1.26.0). It can only raise the compiled-in floor of 8 (services at scale DS9): a value of 8 or below changes nothing, so 9 is the only value that tightens admission."
+            }
+          }
+        },
+        "forensics": {
+          "type": "object",
+          "description": "Schema 2 (M5): on-disk forensics home — audit rings and black-box bags. Bind-mount a persistent volume; deliberately not the shm/ipc dir.",
+          "additionalProperties": false,
+          "properties": {
+            "dir": {
+              "type": "string"
+            },
+            "bag_max_bytes": {
+              "type": "integer",
+              "minimum": 1048576
+            },
+            "bag_split_bytes": {
+              "type": "integer",
+              "minimum": 1048576
+            }
+          }
+        },
+        "recovery": {
+          "type": "object",
+          "description": "Schema 2 (§3.2): what a half does about its own blindness, and (cross_check_*) about its own view being wrong. A source half that has discovered nothing while its config lists source rules re-creates its ROS context, node and every entity below them IN PROCESS — a new rmw participant, the same pid — and backs off between attempts so a world that is legitimately empty stays cheap and quiet.",
+          "additionalProperties": false,
+          "properties": {
+            "blind_grace_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "rebuild": {
+              "type": "boolean"
+            },
+            "rebuild_after_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "backoff_max_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 604800
+            },
+            "max_rebuilds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "exit_after_rebuilds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cross_check_s": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400,
+              "description": "SPEC §3.2 cross-check cadence in seconds (default 300, and 3600 on a half whose process runs rmw_zenoh_cpp, since zenoh-c keeps about 25 KB of every session a probe opens and closes; an explicit value always wins and the status reports the one in effect as discovery.cross_check_s; 0 disables it and with it every verdict that depends on a second participant's evidence). Past this cadence the half creates ONE throwaway participant in its own world and asks what that fresh view can see that the half cannot, and whether the lanes the half is demonstrably moving bytes into deliver anything to it. It exists because a participant cannot audit itself: measured twice on robots, in opposite worlds over different transports, a half's own graph or its own delivery diverged from what actually crossed while every surface reported the divergent view as health."
+            },
+            "cross_check_fast_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400,
+              "description": "Cadence used while a cross-check finding STANDS (default 60, must be <= cross_check_s): a fault is confirmed and escalated in a minute while a healthy robot pays one throwaway participant every five."
+            }
+          }
+        },
+        "worlds": {
+          "type": "object",
+          "description": "Exactly two user-named worlds (v1 limit enforced by validation, not schema — the shape generalizes to the 1×N star).",
+          "minProperties": 2,
+          "maxProperties": 2,
+          "additionalProperties": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "env": {
+                "type": "object",
+                "description": "Launcher-only convenience; ignored by airlock_half (R1).",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              },
+              "diagnostics": {
+                "type": "boolean"
+              },
+              "status_dir": {
+                "type": "string",
+                "pattern": "^/",
+                "description": "Schema 9 (1.26.0 SD7): where this world's half writes status_<world>.json, a directory of its own (created 0700 when missing; refused at start when another uid owns it or anyone else may read or write it). Default: ipc.dir. Start-only: a reload that changes it is refused in place. A reader of the status takes the path from here, never from the other half's status."
+              },
+              "forensics_dir": {
+                "type": "string",
+                "pattern": "^/",
+                "description": "Schema 9 (1.26.0 SD7): where this world's half writes its audit rings, black box, violation ring, api audit file and history ring, a directory of its own (the status_dir rules). Default: forensics.dir (the history ring then stays in ipc.dir). Start-only."
+              },
+              "metrics": {
+                "type": "object",
+                "description": "Schema 2 (M5): opt-in Prometheus /metrics endpoint served by this world's half. Airlock-pattern guidance: protected side only, bind localhost/robot-LAN.",
+                "required": [
+                  "bind"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "bind": {
+                    "type": "string",
+                    "pattern": "^.+:[0-9]{1,5}$"
+                  },
+                  "allow_untrusted_bind": {
+                    "type": "boolean",
+                    "description": "Schema 6 (SPEC-HARDENING §7.2): permits a non-loopback /metrics bind on the connector half; without it such a bind is refused. Default false."
+                  }
+                }
+              },
+              "api": {
+                "type": "object",
+                "description": "Schema 9 (1.26.0, docs/2026-10-17-SPEC-1.26.0.md Part A): the host request surface of this world's half, a local stream socket speaking newline-delimited JSON for host tooling. Absent, nothing listens. The half admits uid 0 and allow_uids to the whole block, its own uid to what the wall carries (unless trust_own_uid), and refuses every other uid before reading its request.",
+                "required": [
+                  "socket"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "socket": {
+                    "type": "string",
+                    "pattern": "^/",
+                    "maxLength": 107,
+                    "description": "Required. An absolute path whose directory exists, is owned by this half's uid or root and is writable by nobody else; the half never creates it. Keep it out of ipc.dir on the listener half (the connector shares that directory)."
+                  },
+                  "allow_uids": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4294967294
+                    },
+                    "description": "Uids admitted to the whole block beside 0."
+                  },
+                  "trust_own_uid": {
+                    "type": "boolean",
+                    "description": "Admit this half's own uid to the whole block (default false: the wall's scope only)."
+                  },
+                  "samples": {
+                    "anyOf": [
+                      {
+                        "const": "carried"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^/"
+                        }
+                      }
+                    ],
+                    "description": "carried (default): every topic this world's directions carry, and (1.27.0) every lane delivered into this world by its destination name; or a list of exact names: source names of lanes from this world, destination names (namespace and rename applied) of lanes into it."
+                  },
+                  "calls": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^/"
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "service",
+                            "request"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "service": {
+                              "type": "string",
+                              "pattern": "^/"
+                            },
+                            "request": {
+                              "type": "object",
+                              "description": "1.27.0: the fixed request (the request type's fields, {} for none): a host call may omit its request (this one is sent) or send one equal to it field for field; anything else is refused not_allowed."
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "description": "Exact source names of services served in this world, or api.local.services names; since 1.27.0 an item may be {service, request} to fix the request a host call may send. Default: none (read-only)."
+                  },
+                  "retain": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^/[^*]*$"
+                    },
+                    "description": "1.26.1: exact topic entries of a direction from this world, and (1.27.0) the destination names of exact entries of a direction into it (each one a name `samples` admits, its max_bytes within max_raw_sample_bytes) that keep a standing reader for the half's life: a sample answers from its newest message (`retained: true`) instead of creating and removing a reader in the world each time, unless the request asks `fresh: true`. One endpoint per name. 1.28.0: also an api.local.topics name (typed and exact, as its entry declares it); every retained name is watchable (`watch`). Default: none."
+                  },
+                  "max_watchers": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16,
+                    "description": "1.28.0 W3: the watch streams served at once, one of them reserved for uid 0 (a watch line hands its connection's slot of max_connections over to this pool). Default 4."
+                  },
+                  "max_watch_names": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32,
+                    "description": "1.28.0 W3: the names one watch may carry. Default 8."
+                  },
+                  "max_goals": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8,
+                    "description": "1.28.0 A1: the goal streams served at once, one of them reserved for uid 0 (an action_goal line hands its connection's slot of max_connections over to this pool; a goal never holds one of max_inflight). Default 2."
+                  },
+                  "actions_feedback_max_hz": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "description": "1.28.0 A1: feedback lines a second per goal stream at most; newer feedback inside the window replaces the held one, the newest leaves at its end. Status transitions are never held back. Default 5."
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "description": "1.28.0 A3: the actions the host may drive from this half, each served in THIS half's world: an exact action entry of a direction from this world (name it without type or purpose), or a local action the wall does not carry (type and purpose both required). An action delivered into this world from the other is refused (its server lives in the other world). Each answers uid 0 only unless its own allow_uids admits more; api.allow_uids and trust_own_uid never extend to actions. Not on a Humble half (refused by name). Default: none.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["action", "max_duration_s"],
+                      "properties": {
+                        "action": {"type": "string", "pattern": "^/[^*]*$", "description": "The exact action name in this half's world."},
+                        "max_duration_s": {"type": "number", "minimum": 0.1, "maximum": 86400, "description": "REQUIRED, no default: the half cancels a host goal this long after it sent it and ends its stream `timeout`."},
+                        "accept_timeout_s": {"type": "number", "minimum": 0.1, "maximum": 60, "description": "The server must match and answer the goal within this. Default 5."},
+                        "timeout_s": {"type": "number", "minimum": 0.1, "maximum": 60, "description": "Bounds a cancel's response and the result after a terminal status. Default 2."},
+                        "lost_after_s": {"type": "number", "minimum": 1, "maximum": 600, "description": "A goal whose server matched nothing, or whose id left the status array, this long is `lost` and frees its slot. Default 10."},
+                        "allow_uids": {"type": "array", "maxItems": 16, "items": {"type": "integer", "minimum": 1}, "description": "Uids besides 0 that may drive the action (each must also reach the socket)."},
+                        "goal": {"type": "object", "description": "A fixed goal: a goal request may omit `goal` (this one is sent) or send one equal to it field for field; anything else is refused not_allowed. Exclusive with goal_constraints."},
+                        "goal_constraints": {"type": "object", "maxProperties": 32, "additionalProperties": {"type": ["string", "number", "boolean"]}, "description": "Field paths inside the goal (pose.header.frame_id) pinned to a scalar, checked after the encoder filled the goal; refused not_allowed naming the path. Exclusive with goal."},
+                        "type": {"type": "string", "pattern": "^[a-z][a-z0-9_]*/action/[A-Z][A-Za-z0-9]*$", "description": "A local action's type (pkg/action/Name)."},
+                        "purpose": {"type": "string", "minLength": 1, "maxLength": 255, "description": "A local action's reason for the host to drive what the wall does not carry."}
+                      }
+                    }
+                  },
+                  "adapters": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "description": "1.29.0 C12: the adapters you expect on this half's socket, each by the name its requests state (`adapter`), the uid its process runs as and why it is there. The block declares and matches; it grants nothing (a uid reaches the socket through allow_uids or trust_own_uid as before, and check warns when a declared uid is not admitted). The status's extensions[] reports each one connected, idle or absent, and doctor names a missing one without touching the half's health. Default: none.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name", "uid", "purpose"],
+                      "properties": {
+                        "name": {"type": "string", "pattern": "^[a-z0-9_-]{1,32}$", "description": "The adapter's name, unique in the block."},
+                        "uid": {"type": "integer", "minimum": 0, "maximum": 4294967294, "description": "The uid its process runs as; a request naming the adapter from another uid is refused not_allowed and audited."},
+                        "purpose": {"type": "string", "minLength": 1, "maxLength": 255, "description": "Why the adapter is attached (doctor prints it)."},
+                        "stale_s": {"type": "integer", "minimum": 1, "maximum": 86400, "description": "With no connection open and no request for this long, doctor warns extension.stale. Default 60."}
+                      }
+                    }
+                  },
+                  "readiness": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "1.29.0 C12: a readiness profile file (schema/readiness.schema.json; a relative path is the config file's directory's): the topics, services and actions an integration needs in this half's world. The half evaluates it read-only and reports readiness[] in status and doctor; it never gates a lane, a call or a goal. Re-read on SIGHUP. A profile that does not parse never takes the half down: it keeps the running profile (none at start) and reports readiness_error and doctor readiness.profile_invalid; check refuses the file. Default: none."
+                  },
+                  "watch": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "1.28.0 W1, W4, W5: the rates of the watch streams.",
+                    "properties": {
+                      "max_hz": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Updates a second per watched name at most; newer takes inside the window replace the held one, the newest leaves at its end. Default 10."
+                      },
+                      "keepalive_s": {
+                        "type": "number",
+                        "minimum": 0.2,
+                        "maximum": 10,
+                        "description": "A keepalive line after this long without a line; a client that sees none for 3 x keepalive_s treats the half as gone, and a line the client leaves undrained that long closes its stream. Default 1."
+                      },
+                      "max_updates_per_s": {
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 2000,
+                        "description": "The updates the half renders a second across every watch (the thread also serves calls); over it, updates coalesce. Default 200."
+                      }
+                    }
+                  },
+                  "local": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "services": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "service",
+                            "type",
+                            "purpose"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "service": {
+                              "type": "string",
+                              "pattern": "^/"
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "timeout_s": {
+                              "type": "number"
+                            },
+                            "max_request_bytes": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "max_response_bytes": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "max_inflight": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1024
+                            },
+                            "finite": {
+                              "type": "boolean"
+                            },
+                            "request": {
+                              "type": "object",
+                              "description": "1.27.0: the fixed request of this local service (see calls)."
+                            },
+                            "purpose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255,
+                              "description": "Why the host may reach a name the wall does not carry; doctor and the audit print it."
+                            }
+                          }
+                        }
+                      },
+                      "topics": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "topic",
+                            "type",
+                            "purpose"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "topic": {
+                              "type": "string",
+                              "pattern": "^/"
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "purpose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255,
+                              "description": "Why the host may reach a name the wall does not carry; doctor and the audit print it."
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "description": "Names the wall does not carry that the host may call or sample, never advertised to the peer."
+                  },
+                  "max_connections": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "max_inflight": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "max_request_bytes": {
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 1048576
+                  },
+                  "max_sample_bytes": {
+                    "type": "integer",
+                    "minimum": 4096,
+                    "maximum": 16777216
+                  },
+                  "max_raw_sample_bytes": {
+                    "type": "integer",
+                    "minimum": 4096,
+                    "maximum": 67108864
+                  },
+                  "rate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "samples": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "per_s": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          "burst": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          }
+                        }
+                      },
+                      "calls": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "per_s": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          "burst": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          }
+                        }
+                      },
+                      "graph": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "per_s": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          "burst": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,30}$"
+          }
+        },
+        "directions": {
+          "type": "array",
+          "description": "Schema 3 union semantics: repeated (from,to) entries are FRAGMENTS of one direction (the renderer appends base + concern + overlay blocks; the engine unions their lane lists — namespace must agree, at most one fragment carries tf or audit, duplicate lane names stay fatal). After merging, at most one direction per ordered pair of the two worlds. Older schemas keep the strict one-entry-per-pair rule, enforced by validation.",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string",
+                "pattern": "^$|^/[A-Za-z0-9_/]*[A-Za-z0-9_]$"
+              },
+              "audit": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "Schema 2 (M5): presence enables the inbound audit ring for this direction, written by its SOURCE half under forensics.dir (three record classes: allowlisted per-message with sender GID, denied-name discovery events, over-cap drops).",
+                "additionalProperties": false,
+                "properties": {
+                  "ring_bytes": {
+                    "type": "integer",
+                    "minimum": 65536,
+                    "maximum": 1073741824
+                  }
+                }
+              },
+              "exclude": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^((topic|service|action):)?(/|\\*\\*|@)"
+                },
+                "description": "Patterns (segment globs), exact names and @preset references subtracted from this direction's globs. Schema 7 (DS3, DS11): an item may name its kind (`topic:`, `service:`, `action:`); a bare item applies to every kind. An exact entry is never excluded. Both halves apply it. Presets come from share/ros2_airlock/presets.d and <config dir>/presets.d (@ros-noise, @debug, @lifecycle ship with the engine)."
+              },
+              "allow_open_inbound": {
+                "type": "boolean",
+                "description": "Schema 6 (SPEC-DX §3.3): permits a glob with no literal segment (/**, /*) on a direction into the listener's world; refused without it."
+              },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "topic"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "topic": {
+                      "type": "string",
+                      "pattern": "^/"
+                    },
+                    "type": {
+                      "type": "string",
+                      "maxLength": 159,
+                      "pattern": "^[a-z][a-z0-9_]*/(msg|srv|action)/[A-Z][A-Za-z0-9_]*$"
+                    },
+                    "rename": {
+                      "type": "string",
+                      "pattern": "^/"
+                    },
+                    "activation": {
+                      "enum": [
+                        "lazy",
+                        "always"
+                      ]
+                    },
+                    "max_bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1073741824
+                    },
+                    "max_hz": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 10000,
+                      "description": "0 = unlimited."
+                    },
+                    "qos": {
+                      "$ref": "#/$defs/qos"
+                    },
+                    "qos_in": {
+                      "$ref": "#/$defs/qos"
+                    },
+                    "qos_out": {
+                      "$ref": "#/$defs/qos"
+                    },
+                    "provenance": {
+                      "enum": [
+                        "base",
+                        "concern",
+                        "overlay"
+                      ],
+                      "description": "Schema 3: renderer-written origin annotation (base config / agent concern / /run overlay), semantically inert for bridging — echoed into status_<world>.json per lane."
+                    },
+                    "expires": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Schemas 3-5: overlay lease expiry, echoed verbatim; the engine never acts on it (requires provenance: overlay). Schema 6 (SPEC-DX §3.4): a strict RFC 3339 instant with a zone that the engine ACTS on — both halves stop bridging the entry at the deadline (the earlier of their monotonic and wall clocks), inert while the kernel clock is unsynchronised, inert across restarts once passed, and a deadline more than 7 days ahead is refused by airlock check. Any provenance; never with protected; outside the reload fingerprint (confirming is hitless)."
+                    },
+                    "protected": {
+                      "type": "boolean",
+                      "description": "Schema 3: arms the SPEC §3.6 reload guard — a reload that drops, shadows, moves or unprotects this entry is rejected in place by the running halves (defense in depth below the cockpit agent). Not valid on glob entries or overlay leases."
+                    },
+                    "record": {
+                      "type": "boolean",
+                      "description": "Schema 2 (M5): black-box rosbag2 of post-enforcement admitted traffic, written by the destination half; bounded by forensics.bag_max_bytes."
+                    },
+                    "frame_prefix": {
+                      "type": "boolean",
+                      "description": "Schema 3 (R6): opt-in per-lane frame rewrite on republish - header.frame_id (and child_frame_id where the type carries one, e.g. nav_msgs/Odometry) prefixed with the direction namespace, exactly the tf.merged rewrite scoped to this entry. Requires a direction namespace; honors tf.shared_frames; empty frames stay untouched; frameless types no-op."
+                    },
+                    "convert": {
+                      "enum": [
+                        "auto",
+                        "explicit",
+                        "deny"
+                      ],
+                      "description": "Schema 5 (SPEC-CROSS-RELEASE §5.2, D8): what the conversion owner may do when the two halves hold different definitions of this type. auto (the default) plans field-level conversion; explicit (the default when protected) requires every dropped, defaulted or widened field to be acknowledged by a rule in type_map.d/; deny refuses any mismatch."
+                    },
+                    "deadman": {
+                      "type": "object",
+                      "description": "Schema 2 (M5): destination-half watchdog — from `ms` after the last admitted message, republish the neutral payload at `hz` until the stream resumes. Typed non-glob entries only.",
+                      "required": [
+                        "ms"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "ms": {
+                          "type": "integer",
+                          "minimum": 10,
+                          "maximum": 60000
+                        },
+                        "hz": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 100
+                        },
+                        "neutral": {
+                          "type": "object",
+                          "description": "YAML field map converted to the topic's type via introspection; unset fields zero-initialized; omitted = all-zeros message."
+                        }
+                      }
+                    },
+                    "types": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*/msg/[A-Z][A-Za-z0-9]*$"
+                      },
+                      "description": "Schema 6 (SPEC-HARDENING §4): the types a GLOB entry may carry; required on a glob into the listener's world."
+                    },
+                    "finite": {
+                      "type": "boolean",
+                      "description": "Schema 6 (SPEC-HARDENING §4): on an entry into the listener's world, drop a frame carrying a non-finite float (default true)."
+                    },
+                    "allow_reserved": {
+                      "type": "boolean",
+                      "description": "Schema 6 (SPEC-HARDENING §7.1): lets an exact entry publish a reserved destination (/clock, /parameter_events, /rosout, a hidden name); refused without it. Not valid on globs."
+                    },
+                    "class": {
+                      "enum": [
+                        "control",
+                        "normal",
+                        "bulk"
+                      ],
+                      "description": "Schema 8 (1.25.0 SD24): the lane's class, over the rules (unset: control for /tf, /tf_static and a protected entry; by an explicit `max_bytes`, bulk at or above airlock.bulk_threshold_bytes and normal below it; else bulk by the bulk type list; else normal, promoted live to bulk past the threshold). `control` is never promoted; `bulk` runs on the bulk executor at nice +10 under the byte cap. Not valid on a service or action entry (always control)."
+                    },
+                    "max_bytes_per_s": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1073741824,
+                      "not": {
+                        "exclusiveMinimum": 0,
+                        "exclusiveMaximum": 65536
+                      },
+                      "description": "Schema 8 (1.25.0 SD25): the lane's byte cap per second; 0 = unlimited, else at least 65536. Unset: airlock.bulk_max_bytes_per_s for a bulk lane, unlimited otherwise. A token bucket at the source holding max(max_bytes, cap / 4), so one sample at the entry's size always fits; above the cap the newest sample is kept and the older ones are counted `dropped_cap`. Hitless on reload."
+                    }
+                  }
+                }
+              },
+              "services": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "service"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "service": {
+                      "type": "string",
+                      "description": "The source-world service name, or (schema 7, DS2) a segment glob over the service name: a glob takes no `type` (types are discovered; list the allowed ones under `types`), cannot `rename`, be `protected` or `allow_reserved`, and needs `timeout_s` >= 0.5. A pattern without a leading '/' reads as '/pattern'."
+                    },
+                    "type": {
+                      "type": "string",
+                      "maxLength": 159,
+                      "description": "Required on an exact entry; refused on a glob."
+                    },
+                    "rename": {
+                      "type": "string",
+                      "pattern": "^/",
+                      "description": "Schema 3: destination-world exposed name before the namespace prefix (the topic-rename twin) - the service appears in the `to` world as namespace + rename. Exposed names must be unique within a direction."
+                    },
+                    "timeout_s": {
+                      "type": "number",
+                      "minimum": 0.001,
+                      "maximum": 3600
+                    },
+                    "max_request_bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1073741824
+                    },
+                    "provenance": {
+                      "enum": [
+                        "base",
+                        "concern",
+                        "overlay"
+                      ]
+                    },
+                    "expires": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "See the topic entry's expires."
+                    },
+                    "protected": {
+                      "type": "boolean"
+                    },
+                    "convert": {
+                      "enum": [
+                        "auto",
+                        "explicit",
+                        "deny"
+                      ],
+                      "description": "Schema 5 (SPEC-CROSS-RELEASE §5.2, D23): services default to explicit — a drifted request or response converts only where a rule acknowledges each dropped or defaulted field."
+                    },
+                    "max_inflight": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1024,
+                      "description": "Schema 6 (SPEC-HARDENING §3.4): requests in flight per service (default 8 since 1.24.0, 32 before); past it a request is answered at once with a marked busy reply, by the caller's half first. Since 1.24.0 it also sizes both of the lane's channels: max(queue_depth, max_inflight) + 3 slots each (services at scale §3.2)."
+                    },
+                    "finite": {
+                      "type": "boolean",
+                      "description": "Schema 6 (SPEC-HARDENING §4): on an entry into the listener's world, drop a frame carrying a non-finite float (default true)."
+                    },
+                    "allow_reserved": {
+                      "type": "boolean",
+                      "description": "Schema 6: lets the entry expose a hidden name."
+                    },
+                    "max_response_bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1073741824,
+                      "description": "Schema 7 (DS1): the largest serialized response the lane carries (the response channel's slot); default the entry's max_request_bytes. Before schema 7 every service reserved a fixed 10 MiB."
+                    },
+                    "max_matches": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535,
+                      "description": "Schema 7, a glob only: the most service names it carries at once; required on a glob into the listener's world, whose max_matches is reserved out of the glob share of max_lanes."
+                    },
+                    "types": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 159
+                      },
+                      "description": "Schema 7, a glob only: the pkg/srv/Name types it may carry; required on a glob into the listener's world."
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "service": {
+                            "pattern": "\\*"
+                          }
+                        }
+                      },
+                      "then": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "type"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "rename"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "protected"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "allow_reserved"
+                              ]
+                            }
+                          ]
+                        },
+                        "properties": {
+                          "timeout_s": {
+                            "minimum": 0.5
+                          }
+                        }
+                      },
+                      "else": {
+                        "required": [
+                          "type"
+                        ],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "max_matches"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "types"
+                              ]
+                            }
+                          ]
+                        },
+                        "properties": {
+                          "service": {
+                            "pattern": "^/"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "actions": {
+                "type": "array",
+                "description": "Reserved at M1 (free_fleet spike): bridged from M3 as genuine namespaced action servers with the exact _action/* hidden entities.",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "description": "The action name, or (schema 7, DS2) a segment glob over the action name (never its parts): an action matches only when all five parts exist with one type."
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "timeout_s": {
+                      "type": "number",
+                      "minimum": 0.001,
+                      "maximum": 3600
+                    },
+                    "provenance": {
+                      "enum": [
+                        "base",
+                        "concern",
+                        "overlay"
+                      ]
+                    },
+                    "expires": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "See the topic entry's expires; propagated onto the action's five parts."
+                    },
+                    "protected": {
+                      "type": "boolean"
+                    },
+                    "convert": {
+                      "enum": [
+                        "auto",
+                        "explicit",
+                        "deny"
+                      ],
+                      "description": "Schema 5 (SPEC-CROSS-RELEASE §5.2, D23): propagated onto the action's five parts; every part defaults to explicit."
+                    },
+                    "finite": {
+                      "type": "boolean",
+                      "description": "Schema 6 (SPEC-HARDENING §4): on an entry into the listener's world, drop a frame carrying a non-finite float (default true)."
+                    },
+                    "max_response_bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1073741824,
+                      "description": "Schema 7: the get_result and send_goal response cap (default 65536, the part caps); cancel_goal keeps 4096 both ways."
+                    },
+                    "max_matches": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535,
+                      "description": "Schema 7, a glob only: the most action names it carries (each holds 5 lanes)."
+                    },
+                    "types": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 159
+                      },
+                      "description": "Schema 7, a glob only: the pkg/action/Name types it may carry."
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "action": {
+                            "pattern": "\\*"
+                          }
+                        }
+                      },
+                      "then": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "type"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "protected"
+                              ]
+                            }
+                          ]
+                        },
+                        "properties": {
+                          "timeout_s": {
+                            "minimum": 0.5
+                          }
+                        }
+                      },
+                      "else": {
+                        "required": [
+                          "type"
+                        ],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "max_matches"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "types"
+                              ]
+                            }
+                          ]
+                        },
+                        "properties": {
+                          "action": {
+                            "pattern": "^/"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "tf": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "namespaced": {
+                    "type": "boolean",
+                    "description": "Raw byte-identical passthrough to <ns>/tf[_static], frames ALWAYS untouched (decision 2026-08-14)."
+                  },
+                  "merged": {
+                    "type": "boolean"
+                  },
+                  "shared_frames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1073741824,
+                    "description": "1.25.0 (schema 8, additive): the cap of the block's /tf and /tf_static lanes, validated like an entry's max_bytes; default 65536, within the default airlock.rt.max_frame_bytes, so the lanes' destination pumps are real-time eligible. A /tf frame above it is dropped at the source (dropped_size); a /tf_static aggregate above it is not shipped (tf_static_over_cap) and the previous one stays latched."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "service_idle_s": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "Schema 7 (services at scale SD4): seconds without a call before a lazy service's channels are released on both halves; default 30, 0 = never release. One value per file, hitless on reload."
+        },
+        "bulk_max_bytes_per_s": {
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 1073741824,
+          "description": "Schema 8 (1.25.0 SD28): the byte cap per second of every `bulk` topic lane whose entry sets no `max_bytes_per_s`; default 4194304 (4 MiB/s). Shaped at the source (drop-oldest, the newest sample kept), enforced at the destination at twice the cap. Hitless on reload."
+        },
+        "bulk_threshold_bytes": {
+          "type": "integer",
+          "minimum": 4096,
+          "maximum": 1073741824,
+          "description": "Schema 8 (1.25.0 SD24, SD28): an entry whose explicit `max_bytes` is at least this is `bulk`, and a `normal` lane (not an explicit one) whose forwarded sample is larger becomes `bulk` from that sample on (`class_reason: observed`, until a reload). Default 262144 (256 KiB). Hitless on reload."
+        },
+        "bulk_threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Schema 8 (1.25.0 SD26): the threads of the bulk executor (`alk-exb-<n>`, nice +10) that serves every `bulk` lane's callbacks apart from the control and normal lanes. Default 1. Start-only: a reload that changes it says it needs a restart."
+        },
+        "rt": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Schema 8 (1.25.0 Part D', SD36-SD38): real-time priority for the destination pumps of `control` topic lanes (`alk-rxc-<n>`), applied by the engine itself; absent = no RT. The container needs an rtprio ulimit of at least `pump_fifo_priority` (docker --ulimit rtprio=<n>, Podman Ulimit=rtprio=<n>) or CAP_SYS_NICE; without it the half logs the refusal once, reports it as process.rt in the status and doctor process.rt_refused, and runs without RT. Never the executors, the service pumps, the normal or bulk pumps. Hitless on reload (applied to every eligible pump at once). docs/user/threads-and-pinning.md.",
+          "properties": {
+            "pump_fifo_priority": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 49,
+              "description": "The SCHED_FIFO priority, 1-49 (never at or above the kernel's threaded IRQs, 50, or a driver's real-time threads, 60). `airlock check` warns above 10; the recommended band is 5-10."
+            },
+            "pump_batch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "description": "The frames an RT pump takes per wake before it waits at most 1 ms (a yield to the CPU's other work). Default 8."
+            },
+            "max_frame_bytes": {
+              "type": "integer",
+              "minimum": 4096,
+              "maximum": 1048576,
+              "description": "The largest `max_bytes` a FIFO pump serves (its run per wake scales with the frame); a control lane above it runs without FIFO (`rt: ineligible:max_bytes` on its row, and `airlock check` warns). Default 65536."
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "qos": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reliability": {
+          "enum": [
+            "reliable",
+            "best_effort"
+          ]
+        },
+        "durability": {
+          "enum": [
+            "volatile",
+            "transient_local"
+          ]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "history": {
+          "not": {},
+          "description": "Not configurable: any value is refused (SPEC §3.4). keep_all egress is rejected by design and `depth` implies keep_last. The loader knows the key only to say so."
+        }
+      }
+    }
+  }
+}

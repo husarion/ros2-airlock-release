@@ -82,7 +82,7 @@ airlock:
 The same wall at schema 9, after `migrate` and the edits it asked for:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot, queue_depth: 2 }
@@ -121,6 +121,14 @@ airlock:
           type: geometry_msgs/msg/TwistStamped
           max_hz: 50
           max_bytes: 4096
+```
+
+The first line points your editor at the config schema, so it completes the keys and marks a wrong one while you type. That URL always serves the newest release's schema. The schema of one release is the `airlock.schema-<version>.json` file on its release page, and the same file is inside the image at `/opt/ros2_airlock/share/ros2_airlock/schema/airlock.schema.json`:
+
+```bash
+id=$(docker create husarion/ros2-airlock:1.29.0-jazzy)
+docker cp "$id:/opt/ros2_airlock/share/ros2_airlock/schema/airlock.schema.json" - | tar -xO > airlock.schema.json
+docker rm "$id"
 ```
 
 ## Shared memory is reserved when a half starts

@@ -3,7 +3,7 @@
 The airlock pattern is the production profile this project exists for: the robot's full API readable, a tiny enumerated command surface writable, everything else nonexistent, and evidence kept at the boundary. This is the whole shape, schema 9:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot, queue_depth: 2, shm_budget: 268435456 }
@@ -61,7 +61,7 @@ This profile survived the incident it was designed against: 30 minutes of sustai
 
 ## The asymmetry, knob by knob
 
-**Outbound is generous, inbound is enumerated.** The glob exposes the whole API but lazily: an unconsumed topic costs nothing, and preallocates nothing. Inbound entries are exact name plus declared type, so the writable surface is a list you can read aloud. Inbound `services` stays empty unless the robot genuinely needs to call outward.
+**Outbound is generous, inbound is enumerated.** The glob exposes the whole API but lazily: an unconsumed topic costs nothing, and preallocates nothing. Inbound entries are exact name plus declared type, so the writable surface is a list you can read aloud. Inbound `services` stays empty unless the robot genuinely needs to call outward. The halves add no control surface of their own: since 1.29.0 they answer no parameter service and publish no `/parameter_events` in either world.
 
 **Every inbound entry is capped three ways.** `max_hz` decimation, `max_bytes` size cap, `depth: 1` queue. Enforced in the fleet-side half and enforced again in the robot-side half, because the fleet-side half is the sacrificial component: a flood may saturate it, but what reaches the robot side is bounded by the caps regardless.
 

@@ -3,7 +3,7 @@
 A script on the robot's host often needs one fact from the driver's world, such as whether the e-stop is latched after a driver restart. Reading it with `ros2 topic echo --once` starts a ROS participant for each read, and a participant killed in the middle of a message can leave the driver's shared-memory world closed to newcomers. From engine 1.26.0 (config schema 9) the half that already lives in that world answers instead, on a local socket the config names. It reads one sample of a lane it carries or calls a service it serves, and it also returns the graph it sees.
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot }
@@ -66,7 +66,7 @@ ros2 airlock sample /autonomous/cmd_vel -c /etc/airlock/airlock.yaml --field lin
 ros2 airlock graph -c /etc/airlock/airlock.yaml
 ```
 
-The sample is the lane's newest message, read by the half inside its own world, with `publishers`, `latched` (the half saw a message older than its reader, which is how a latched topic looks) and `age_s` beside it. `latched` describes the message you got, not the topic: a latched topic whose value changed after the reader started (an e-stop reset, say) answers `latched: false`, because that copy arrived live. To tell an on-change latched topic, where any age is current, from a periodic topic that went silent, read `durability` instead: it is `transient_local` when every publisher of the topic is. The lane itself does not change: a sample is not demand, it starts no flow and moves no counter of the wall. `/hardware/e_stop` is listed under `retain` (from engine 1.26.1), so the half keeps a reader on it all the time and answers from the newest message that reader took, marked `retained: true`, with `age_s` counted from when it arrived; the next section says why a polled latched topic wants that.
+The sample is the lane's newest message, read by the half inside its own world, with `publishers`, `latched` (the half saw a message older than its reader, which is how a latched topic looks) and `age_s` beside it. `latched` describes the message you got, not the topic: a latched topic whose value changed after the reader started (an e-stop reset, say) answers `latched: false`, because that copy arrived live. To tell an on-change latched topic, where any age is current, from a periodic topic that went silent, read `durability` instead: it is `transient_local` when every publisher of the topic is. A lane this world carries out does not change: the sample reads its source here, starts no flow and moves no counter of the wall (a lane delivered into this world is the case below, where a sample is demand for its wait). `/hardware/e_stop` is listed under `retain` (from engine 1.26.1), so the half keeps a reader on it all the time and answers from the newest message that reader took, marked `retained: true`, with `age_s` counted from when it arrived; the next section says why a polled latched topic wants that.
 
 ## What the socket serves, and to whom
 
@@ -84,7 +84,7 @@ A host call goes through a client the half owns, never through the wall's lane, 
 
 ### Lanes the fleet sends into the robot (engine 1.27.0)
 
-A lane the peer delivers into the half's world can be sampled too, by the name it has in that world: above, the fleet's `/cmd_vel` arrives in the robot world as `/autonomous/cmd_vel`, and that is the name to ask for and to list in `samples` or `retain`. The half reads it through a reader of its own on that name, so it sees what the robot's nodes see, its own publication of the lane included. The fleet's name `/cmd_vel` means nothing in the robot world and answers `not_carried`. The sample still is not demand: a lazy lane nobody in the robot world asks for stays idle, and a sample of it answers `timeout`. A sample never pauses a flowing lane for its real subscribers either; when the last of them leaves, the lane deactivates 1 to 2 s later (engine 1.28.0; 0 to 1 s before it), and up to 2 s later than that if a sample's reader was released just before and is still matched. The name is known from the config from the moment the half starts: before the fleet publishes it at all, a sample answers `no_publisher` (or `timeout`), as for any lane without a publisher, never `not_carried`, and a name listed in `retain` reads `waiting` under `api.retained` and gets its reader once the lane's publisher appears in the robot world (engine 1.27.1; 1.27.0 answered `not_carried` until the fleet first advertised the lane).
+A lane the peer delivers into the half's world can be sampled too, by the name it has in that world: above, the fleet's `/cmd_vel` arrives in the robot world as `/autonomous/cmd_vel`, and that is the name to ask for and to list in `samples` or `retain`. The half reads it through a reader of its own on that name, so it sees what the robot's nodes see, its own publication of the lane included. The fleet's name `/cmd_vel` means nothing in the robot world and answers `not_carried`. A sample is demand for its wait: a lazy lane nobody in the robot world asks for activates for the sample and goes idle two polls after the sample's reader is gone; the reply's `demand` and `activated_s` say whether the sample woke it. (Engine 1.29.0; before it a sample was never demand, and a sample of such a lane answered `timeout`.) The same holds on the fleet half for a robot lane the fleet world does not subscribe: `airlock_api sample --world fleet` of it answers the robot's value. A sample never pauses a flowing lane for its real subscribers either; when the last of them leaves, the lane deactivates 1 to 2 s later (engine 1.28.0; 0 to 1 s before it), and up to 2 s later than that if a sample's reader was released just before and is still matched. The peer half applies at most one activation change per lane per 2 s, so a sample that comes right after its lane went idle can wait that spacing out; when its wait ends first the reply says so: "the lane went idle N s before this sample; the peer applies one activation change per lane per 2 s: ask again or use --wait 5". What sample demand can cost is bounded: per admitted uid at most `rate.samples.per_s` times the 10 s wait cap lanes are held by samples at once (50 at the defaults `per_s: 5`, with the bucket's `burst` of 10 as a first-second transient), and two knobs shrink it, `samples` (what a sample may read at all) and `rate.samples`. A sample whose lane the source half will not carry can hold that lane unconfirmed past its 15 s grace when two samples follow each other, and the lane row then reads `degraded` for as long as someone keeps asking. A name listed in `retain` is standing demand on a lane delivered into this world: the lane carries at its source's rate for as long as the entry exists, and `check` prints `retain holds lane <name> active` for it (engine 1.29.0). The name is known from the config from the moment the half starts: before the fleet publishes it at all, a sample answers `no_publisher` (or `timeout`), as for any lane without a publisher, never `not_carried`, and a name listed in `retain` reads `waiting` under `api.retained` and gets its reader once the lane's publisher appears in the robot world (engine 1.27.1; 1.27.0 answered `not_carried` until the fleet first advertised the lane).
 
 ### NaN and infinite values (engine 1.27.1)
 
@@ -166,6 +166,65 @@ A goal stream holds one of `api.max_goals` (default 2, one kept for root), never
 
 `airlock_api action` exits 0 when the goal succeeded, 1 when it ended otherwise (aborted, canceled, timeout, lost, not accepted) or the half was lost, 2 when there is no socket to ask, and 3 when the half refused the goal. `--format json` (the default) prints every line as it came, `value` and `--field` the message of each feedback and the result, `yaml` each feedback and result line as a document. `airlock_api cancel` exits 0 when the server took the cancel or the goal had ended, 1 when it was rejected, unknown or unanswered, 3 on `goal_not_found` or `not_allowed`.
 
+## The host contract (engine 1.29.0)
+
+The socket's requests and replies form a contract with its own number, separate from the engine version, the control protocol and the config schema. Every request states it as `"v"`, every reply opens with it, and `airlock_half --constants` lists the numbers an engine serves under `host_contract` ([constants contract](constants-contract.md)). A request of a contract the engine does not serve gets the `version` code, and its message names the contract the half serves, the one the request stated and what to do. The half serves everything else as before.
+
+| Contract | Served since | Served until | Successor |
+| -- | -- | -- | -- |
+| 1 | 1.26.0 | current | none |
+
+A contract stays served for two engine minor releases or six months after its successor ships, whichever is longer. Within a contract, fields and codes are only added: a reply field or a code never changes its meaning, and a code is never reused. What contract 1 added, and when:
+
+| Added | Engine |
+| -- | -- |
+| `graph`, `sample`, `call`; the codes `parse`, `version`, `op`, `size`, `slow`, `uid`, `scope`, `rate`, `inflight`, `connections`, `busy`, `blind`, `not_carried`, `not_allowed`, `not_served`, `invalid_request`, `no_publisher`, `timeout`, `type_unsupported`, `invalid`, `internal` | 1.26.0 |
+| `sample`'s `fresh` | 1.26.1 |
+| `nonfinite` on `sample` | 1.27.1 |
+| `watch`, `action_goal`, `action_cancel`; the codes `not_watchable`, `watchers`, `goals`, `goal_busy`, `goal_not_found` | 1.28.0 |
+| `adapter` on every request; `sample`'s reply fields `demand` and `activated_s` | 1.29.0 |
+
+## Adapters on the socket (engine 1.29.0)
+
+An adapter is a program on the robot's host that speaks a protocol of its own outward (VDA 5050 over MQTT, a fleet manager) and reaches the robot only through a half's socket. Declare the ones you expect in `api.adapters`, and have each one state its name on its requests:
+
+```yaml
+# in worlds.fleet.api
+allow_uids: [10010]
+adapters:
+  - { name: vda5050, uid: 10010, purpose: the VDA 5050 master control's orders }
+```
+
+```json
+{"v":1,"op":"watch","names":["/hardware/e_stop"],"adapter":"vda5050"}
+```
+
+The block declares and matches, and grants nothing: the uid reaches the socket only through `allow_uids` (or `trust_own_uid`), as before, and `check` warns when a declared uid is not admitted. A request's `adapter` binds to its connection, and the audit file names it on every call, goal and stalled watch of that connection (`peer.adapter`). A request that names a declared adapter from another uid is refused `not_allowed` and audited. A name nobody declared is served as usual and noted (doctor `api.adapter_unexpected`).
+
+The status's `extensions[]` has a row per adapter: `connected` while one of its connections is open, `idle` once it has come and has none open, `absent` while it never came, `contract_mismatch` or `uid_mismatch` when its newest request was refused for that. An open connection is a sign of life, so an adapter that holds a watch open and asks rarely stays alive; doctor warns `extension.stale` only when it has had no connection and sent no request for its `stale_s`. A missing adapter is a warning (`extension.absent`) and never changes the half's health ([status reference](status-and-health-reference.md#adapters-and-readiness-engine-1290)).
+
+## A readiness profile (engine 1.29.0)
+
+An integration can say what it needs in a world: topics with their type and a minimum rate, services and actions, each with why. Write that as a profile file, name it in the world's `api.readiness`, and the half reports each item in its status (`readiness[]`) and in doctor (`readiness.<profile>.<item>`). The profile is a report and nothing else: the half gates no lane, call or goal on it, and creates no reader or demand to evaluate it.
+
+```yaml
+readiness: 1
+name: nav2_fleet
+items:
+  - topic: /odometry/filtered
+    type: nav_msgs/msg/Odometry
+    min_hz: 10
+    purpose: the robot's pose the master control reads
+  - service: /map_server/map
+    type: nav_msgs/srv/GetMap
+    purpose: the map orders are planned on
+  - action: /navigate_to_pose
+    type: nav2_msgs/action/NavigateToPose
+    purpose: the goals an order becomes
+```
+
+An item reads `ok`, `missing` (not in the half's graph, no publisher or server, or a lane the half carries reading `no_source`) or `untyped` (present under another type). A `min_hz` is measured only on a lane the half carries or retains: below it the item reads `slow`, on a lazy lane nobody demands `idle` (an idle lane has no rate, and readiness never wakes it), and on a name the half neither carries nor retains `unmeasured`. A retained name is measured by its standing reader, which the half drains every 100 ms, so it reads rates up to about 10 Hz: a `min_hz` over 10 on a name the half only retains reads `unmeasured`. The half reads the profile at start and again on every SIGHUP. A profile that does not parse never takes the half down: the half starts without a profile, or keeps the one it was running, and reports the error in its status (`readiness_error`) and in doctor (`readiness.profile_invalid`). `airlock check <airlock.yaml>` refuses a config whose profile does not parse, and `airlock check --readiness <file>` checks one profile alone ([schema](../../schema/readiness.schema.json)). Version 1 has no tf chains.
+
 ## Every key of the `api:` block
 
 Each world may carry its own `api:` block under `worlds.<world>`; the half of that world serves it. `airlock_half --constants` prints the defaults under `api` ([constants contract](constants-contract.md)).
@@ -177,7 +236,7 @@ Each world may carry its own `api:` block under `worlds.<world>`; the half of th
 | `trust_own_uid` | `false` | Gives the half's own uid the whole block too; `check` warns about it on the listener. |
 | `samples` | `carried` | What a sample may read. `carried` admits every lane the half holds: each topic a direction from this world carries (an exact entry or a name one of its globs admits) and, from 1.27.0, each destination name a direction into this world delivers. A list of exact names admits only those, and each must be such a lane. |
 | `calls` | `[]` (nothing callable) | Exact service names the host may call: a service entry of a direction from this world (its server lives here) or an `api.local.services` name. An item may be `{service: <name>, request: <fields>}` to fix the request (1.27.0). Actions and globs are not callable. |
-| `retain` | `[]` | Up to 16 exact topic names, each with a standing reader for the half's whole run, so a sample costs the world nothing (1.26.1). Each must be sampleable and its entry's `max_bytes` within `max_raw_sample_bytes`. From 1.28.0 also an `api.local.topics` name, and every retained name is watchable. |
+| `retain` | `[]` | Up to 16 exact topic names, each with a standing reader for the half's whole run, so a sample costs the world nothing (1.26.1). Each must be sampleable and its entry's `max_bytes` within `max_raw_sample_bytes`. From 1.28.0 also an `api.local.topics` name, and every retained name is watchable. From 1.29.0 the reader of a lazy lane delivered into this world is standing demand: that lane stays active while the entry exists. |
 | `max_watchers` | 4 (1 to 16) | Watch streams at once (1.28.0); one is kept for root. |
 | `max_watch_names` | 8 (1 to 32) | Names one watch may carry. |
 | `watch.max_hz` | 10 (1 to 50) | Updates a second per watched name at most. |
@@ -186,6 +245,8 @@ Each world may carry its own `api:` block under `worlds.<world>`; the half of th
 | `max_goals` | 2 (1 to 8) | Goal streams at once (1.28.0); one is kept for root. |
 | `actions_feedback_max_hz` | 5 (1 to 20) | Feedback lines a second per goal stream at most. |
 | `actions` | `[]` | Up to 16 actions the host may drive: `action`, the required `max_duration_s` (0.1 to 86400), `accept_timeout_s` (5; 0.1 to 60), `timeout_s` (2; 0.1 to 60, a cancel's response and the result after the end), `lost_after_s` (10; 1 to 600), `allow_uids`, a fixed `goal` or `goal_constraints`, and for a local action `type` and `purpose`. Not on Humble. |
+| `adapters` | `[]` | Up to 16 adapters you expect on this socket (1.29.0): `name` (1 to 32 of `a-z`, `0-9`, `_`, `-`, unique), `uid` (the uid its process runs as), `purpose` (required, up to 255 printable bytes) and `stale_s` (60; 1 to 86400). It grants nothing: the uid still needs `allow_uids`. |
+| `readiness` | none | A readiness profile file (1.29.0), a relative path read from the config file's directory. The half evaluates it read-only and gates nothing on it. |
 | `local.services` | `[]` | Services the host may call that the wall does not carry in this world. Each takes the service entry's keys `service`, `type` (required), `timeout_s`, `max_request_bytes`, `max_response_bytes`, `max_inflight`, `finite`, an optional fixed `request`, and a required `purpose` of up to 255 printable bytes, which doctor and the audit print. |
 | `local.topics` | `[]` | Topics the host may sample that the wall does not carry in this world: `topic`, `type` (required, since no lane discovers it), an optional `max_bytes` and the required `purpose`. Only the uids that get the whole block reach them. |
 | `max_connections` | 4 (1 to 16) | Connections at once; one slot is kept for root. |
@@ -206,7 +267,7 @@ A name under `api.local` must be one the wall does not touch in this world, neit
 From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file. From 1.28.1 on it is built against musl with yaml-cpp built in, so it carries no glibc and runs on any Linux of its architecture:
 
 ```bash
-v=1.28.1; a=arm64
+v=1.29.0; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api

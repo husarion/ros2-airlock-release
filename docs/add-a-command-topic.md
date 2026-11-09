@@ -3,7 +3,7 @@
 Commands flow against the sensor stream: from the fleet world into the robot world. Add a second direction to the config from [Bridge your first topic](bridge-your-first-topic.md):
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /tmp/airlock, listener: robot }

@@ -12,8 +12,8 @@ Every image carries the same bytes as a file and names the contract in two label
 | `com.husarion.airlock.constants.path` | `/opt/ros2_airlock/share/ros2_airlock/constants.json` |
 
 ```bash
-docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.28.1-jazzy
-id=$(docker create husarion/ros2-airlock:1.28.1-jazzy)
+docker inspect -f '{{index .Config.Labels "com.husarion.airlock.constants.schema"}}' husarion/ros2-airlock:1.29.0-jazzy
+id=$(docker create husarion/ros2-airlock:1.29.0-jazzy)
 docker cp "$id:/opt/ros2_airlock/share/ros2_airlock/constants.json" - | tar -xO
 docker rm "$id"
 ```
@@ -94,3 +94,8 @@ The image build refuses a file that differs from the binary's output or that say
 | `api.action_defaults` | object | The defaults of an `api.actions` entry: `accept_timeout_s` (5), `timeout_s` (2) and `lost_after_s` (10); `max_duration_s` has none, it is required. |
 | `lazy` | object | How a lazy lane delivered into a half's world follows its demand (1.28.0). An engine constant, not a config key. |
 | `lazy.deactivate_after_polls` | integer | 2: the consecutive demand polls, 1 s apart, that must find no subscriber before the lane deactivates; a poll that finds one resets the count. A lane deactivates 1 to 2 s after its last subscriber leaves. |
+| `config_keys` | object | The keys `airlock.yaml` accepts, per block (1.29.0): `{path: [key, ...]}` from the one table the engine's loader reads, so a tool or an editor plugin knows them without parsing the engine. A path reads `$` for the file's top level, `.key` for a key of a mapping, `[*]` for every entry of a list and `.*` for every value of a mapping whose keys you choose (a world), for example `$.airlock.directions[*].topics[*]`. The [config schema](https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json) allows exactly these keys at every path, and a test holds the two equal. |
+| `host_contract` | object | The host request socket's contract table (1.29.0). The `v` of every request and reply is the contract's major; `api.request_version` is the same number under its 1.26.0 name. A request of a major the engine does not serve is refused `version`, and the message names both majors and what to do. |
+| `host_contract.served` | array | The majors this engine accepts, `[1]`. |
+| `host_contract.draft` | array | Majors served only by a development image, for trying a successor before it ships; empty in every release. |
+| `host_contract.table` | array | One row per major: `major`, `since` (the engine release that first served it, `1.26.0` for 1), `until` (the last day it is served once a successor ships, null while it is current) and `successor` (that major, null while current). A major stays served for two engine minor releases or six months after its successor ships, whichever is longer. |

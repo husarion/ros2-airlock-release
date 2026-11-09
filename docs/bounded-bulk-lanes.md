@@ -36,7 +36,7 @@ The cap keeps the newest sample. When a publisher sends faster than the cap allo
 ## Change a class or a cap
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot, queue_depth: 2 }

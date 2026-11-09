@@ -68,7 +68,7 @@ Affinity is the deployment's decision. The scheduling policy of the real-time el
 The engine can run the destination pumps of `control` topic lanes at SCHED_FIFO, so a `/tf` frame or a command that has crossed the wall is published into its world ahead of everything that runs at normal priority. You turn it on in the config:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /run/airlock, listener: robot, queue_depth: 2 }

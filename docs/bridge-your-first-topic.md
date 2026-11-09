@@ -3,7 +3,7 @@
 Write one file, start two processes, and a topic crosses from an isolated world into yours. Save this as `airlock.yaml`:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2_airlock/main/schema/airlock.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/airlock.schema.json
 schema: 9
 airlock:
   ipc: { dir: /tmp/airlock, listener: robot }
