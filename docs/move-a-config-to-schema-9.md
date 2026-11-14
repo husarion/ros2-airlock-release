@@ -126,7 +126,7 @@ airlock:
 The first line points your editor at the config schema, so it completes the keys and marks a wrong one while you type. That URL always serves the newest release's schema. The schema of one release is the `airlock.schema-<version>.json` file on its release page, and the same file is inside the image at `/opt/ros2_airlock/share/ros2_airlock/schema/airlock.schema.json`:
 
 ```bash
-id=$(docker create husarion/ros2-airlock:1.29.0-jazzy)
+id=$(docker create husarion/ros2-airlock:1.29.1-jazzy)
 docker cp "$id:/opt/ros2_airlock/share/ros2_airlock/schema/airlock.schema.json" - | tar -xO > airlock.schema.json
 docker rm "$id"
 ```

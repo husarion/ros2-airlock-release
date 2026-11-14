@@ -628,7 +628,7 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 10000,
-                      "description": "0 = unlimited."
+                      "description": "0 = unlimited. `max_hz` limits the lane, not each publisher: every publisher of the topic shares the one budget, so two command sources at 30 Hz on a lane capped at 50 Hz lose frames, and two sources publishing in phase can lose one of them entirely. Set `max_hz` for the sum of the sources, or give each source its own topic."
                     },
                     "qos": {
                       "$ref": "#/$defs/qos"

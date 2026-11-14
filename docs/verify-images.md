@@ -3,7 +3,7 @@
 From 1.28.0 on, Husarion signs every image it publishes, the SBOM attached to each image, and every static `airlock_api` binary, with one cosign key. You can check that what you pull is what Husarion released, and read exactly which packages and Rust crates it contains, before you deploy it. Releases before 1.28.0 carry no signatures.
 
 ```bash
-v=1.29.0   # the release you deploy
+v=1.29.1   # the release you deploy
 curl -fsSLO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/cosign.pub
 cosign verify --key cosign.pub --insecure-ignore-tlog=true husarion/ros2-airlock:$v-jazzy
 ```

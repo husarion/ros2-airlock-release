@@ -49,7 +49,7 @@ ROS_DOMAIN_ID=17 ros2 topic echo /cmd_vel geometry_msgs/msg/TwistStamped
 
 **Exact name, declared type.** Globs are allowed everywhere, but on a direction facing a network you don't fully control, list commands individually with their type. The attack surface stays enumerable, and a publisher offering a different type on the name is rejected instead of forwarded.
 
-**Caps are the contract.** `max_hz` decimates, `max_bytes` drops oversized messages, and both are enforced in the sending half and enforced again on receipt. `depth: 1` with `best_effort` is the right shape for a command stream: a stale command is worse than a dropped one, and nothing inbound can queue up behind a slow consumer. Unbounded reliable history is not expressible in the config at all.
+**Caps are the contract.** `max_hz` decimates, `max_bytes` drops oversized messages, and both are enforced in the sending half and enforced again on receipt. `depth: 1` with `best_effort` is the right shape for a command stream: a stale command is worse than a dropped one, and nothing inbound can queue up behind a slow consumer. Unbounded reliable history is not expressible in the config at all. `max_hz` limits the lane, not each publisher: every publisher of the topic shares the one budget, so two command sources at 30 Hz on a lane capped at 50 Hz lose frames, and two sources publishing in phase can lose one of them entirely. Set `max_hz` for the sum of the sources, or give each source its own topic. The doctor names a lane where this happens as `lane.rate_shared`.
 
 **One name, one direction.** The same topic name cannot appear in both directions; validation rejects it. That rule is what makes bridge loops structurally impossible.
 
