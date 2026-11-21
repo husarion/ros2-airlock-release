@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/refusal.schema.json",
+  "title": "airlock start refusal file (refusal_schema 1)",
+  "description": "1.30.0 K1 (docs/2026-11-14-SPEC-1.30.0.md §2.12 K1, A3): refusal_<world>.json, which a half that refuses to start (exit 2) writes into its status directory (the world's status_dir, else ipc.dir) before it exits, whole and by rename, mode 0644. Not written when the refused directory is that very directory, or the status directory is otherwise unusable, and never for a file that does not load (`airlock: config invalid:`, exit 1 or 2): stderr and the exit code are then the only record. Every start whose file loads and names its world removes an earlier one first (from a directory that is already private), so a later start that exits 1 leaves none behind; a file that does not load names no status directory and removes none, so compare `t` with the start's time. The same id and text are the stderr line `airlock: refused: <id>: <text>`. A consumer keys on `id`, never on `text`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["refusal_schema", "id", "text", "t", "exit"],
+  "properties": {
+    "refusal_schema": {"const": 1, "description": "This document's version."},
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "maxLength": 64,
+      "description": "The refusal's stable id, `<family>.<name>`, never reused for another meaning. 1.30.0's start refusals: host.dev_shm (the standing set over this host's /dev/shm), dirs.ipc (ipc.dir cannot be created or is not private), dirs.permissions (a world's own status_dir or forensics_dir is not private; a refused status_dir leaves no file), dirs.forensics (the shared forensics.dir an audit ring or the black box needs), api.socket_dir (the api socket's directory or path), transport.foreign_owner (iceoryx2 files of another uid under ipc.dir), iox2.pin_leftover (iceoryx2 files of another engine release under ipc.dir while a half of the instance may be alive), iox2.registry (a broken iceoryx2 node registry this half may not or could not repair). 1.31.0 adds the security.* ids."
+    },
+    "text": {"type": "string", "description": "The refusal's text after its id, as the half printed it (the 1.29.1 wording, unchanged): for a person."},
+    "t": {"type": "string", "description": "When the half refused: RFC 3339, UTC, whole seconds (`2026-11-19T22:15:03Z`)."},
+    "exit": {"type": "integer", "description": "The exit code the half returned, always (a signal during the refusal does not change it): 2 (1.31.0's security.not_yet_valid exits 5)."}
+  }
+}

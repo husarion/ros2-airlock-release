@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/readiness.schema.json",
+  "title": "airlock readiness profile (readiness 1)",
+  "description": "1.29.0 C12 (docs/2026-11-06-SPEC-1.29.0.md §2.3 (iii), principle E25): a readiness profile, the file a world's `api.readiness` names. It lists the topics, services and actions an integration needs in that half's world, each with why. The half evaluates it read-only from its own graph and the rates it measures on its carried and retained lanes, reports `readiness[]` in its status and doctor, and gates nothing on it. Strict like the config: an unknown key refuses the file (`airlock check --readiness <file>`, the half at start, a reload). tf chains are not in version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["readiness", "name", "items"],
+  "properties": {
+    "readiness": {"const": 1, "description": "The profile document's version."},
+    "name": {"type": "string", "pattern": "^[a-z0-9_-]{1,32}$", "description": "The profile's name: doctor names its items readiness.<name>.<item>."},
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "purpose"],
+        "oneOf": [
+          {"required": ["topic"], "not": {"anyOf": [{"required": ["service"]}, {"required": ["action"]}]}},
+          {"required": ["service"], "not": {"anyOf": [{"required": ["topic"]}, {"required": ["action"]}, {"required": ["min_hz"]}]}},
+          {"required": ["action"], "not": {"anyOf": [{"required": ["topic"]}, {"required": ["service"]}, {"required": ["min_hz"]}]}}
+        ],
+        "properties": {
+          "topic": {"type": "string", "pattern": "^(/[A-Za-z0-9_]+)+$", "description": "An exact topic name of the half's world."},
+          "service": {"type": "string", "pattern": "^(/[A-Za-z0-9_]+)+$", "description": "An exact service name; present when the graph lists it with a server (where the RMW says)."},
+          "action": {"type": "string", "pattern": "^(/[A-Za-z0-9_]+)+$", "description": "An exact action name; present when its <name>/_action/send_goal service is served."},
+          "type": {"type": "string", "pattern": "^[A-Za-z0-9_]+/(msg|srv|action)/[A-Z][A-Za-z0-9_]*$", "description": "pkg/msg/Name for a topic, pkg/srv/Name for a service, pkg/action/Name for an action; present under another type reads untyped."},
+          "purpose": {"type": "string", "minLength": 1, "maxLength": 255, "description": "Why the integration needs it (doctor prints it)."},
+          "min_hz": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000, "description": "A topic only: the rate it must keep, measured on a lane the half carries or retains (slow under it, idle on a carried lazy lane nobody demands, unmeasured on a name it neither carries nor retains). A retained name's standing reader is drained every 100 ms, so it measures up to about 10 Hz."}
+        }
+      }
+    }
+  }
+}

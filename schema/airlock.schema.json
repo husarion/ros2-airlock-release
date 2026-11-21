@@ -613,6 +613,26 @@
                       "type": "string",
                       "pattern": "^/"
                     },
+                    "absolute": {
+                      "type": "boolean",
+                      "description": "1.30.0 (I2): the direction namespace is not applied to this entry's destination, which is then the rename, the prefix-mapped name or the source name. An absolute /tf or /tf_static is refused (the tf block's pair). Default false."
+                    },
+                    "rename_prefix": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "description": "1.30.0 (I3), a glob only: a match <strip><rest> is exposed as <add><rest> (under the namespace unless absolute). `strip` is whole segments at the start of the glob's text before its first wildcard; either part may be omitted, not both. Two globs of one direction whose destination prefixes overlap under different maps are refused (rename.ambiguous).",
+                      "properties": {
+                        "strip": {
+                          "type": "string",
+                          "pattern": "^/"
+                        },
+                        "add": {
+                          "type": "string",
+                          "pattern": "^/"
+                        }
+                      }
+                    },
                     "activation": {
                       "enum": [
                         "lazy",
@@ -756,6 +776,26 @@
                       "type": "string",
                       "pattern": "^/",
                       "description": "Schema 3: destination-world exposed name before the namespace prefix (the topic-rename twin) - the service appears in the `to` world as namespace + rename. Exposed names must be unique within a direction."
+                    },
+                    "absolute": {
+                      "type": "boolean",
+                      "description": "1.30.0 (I2): see the topic entry's absolute."
+                    },
+                    "rename_prefix": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "description": "1.30.0 (I3), a glob only: see the topic entry's rename_prefix.",
+                      "properties": {
+                        "strip": {
+                          "type": "string",
+                          "pattern": "^/"
+                        },
+                        "add": {
+                          "type": "string",
+                          "pattern": "^/"
+                        }
+                      }
                     },
                     "timeout_s": {
                       "type": "number",
@@ -911,6 +951,31 @@
                     "type": {
                       "type": "string"
                     },
+                    "rename": {
+                      "type": "string",
+                      "pattern": "^/",
+                      "description": "1.30.0 (I1), an exact entry only: the action's destination name before the namespace; its five parts follow it (<rename>/_action/send_goal, get_result, cancel_goal, feedback, status). A glob cannot rename (it takes rename_prefix)."
+                    },
+                    "absolute": {
+                      "type": "boolean",
+                      "description": "1.30.0 (I2): see the topic entry's absolute; the five parts follow."
+                    },
+                    "rename_prefix": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "description": "1.30.0 (I3), a glob only: see the topic entry's rename_prefix; the action's name is mapped and its five parts follow.",
+                      "properties": {
+                        "strip": {
+                          "type": "string",
+                          "pattern": "^/"
+                        },
+                        "add": {
+                          "type": "string",
+                          "pattern": "^/"
+                        }
+                      }
+                    },
                     "timeout_s": {
                       "type": "number",
                       "minimum": 0.001,
@@ -1045,6 +1110,43 @@
                     "minimum": 1,
                     "maximum": 1073741824,
                     "description": "1.25.0 (schema 8, additive): the cap of the block's /tf and /tf_static lanes, validated like an entry's max_bytes; default 65536, within the default airlock.rt.max_frame_bytes, so the lanes' destination pumps are real-time eligible. A /tf frame above it is dropped at the source (dropped_size); a /tf_static aggregate above it is not shipped (tf_static_over_cap) and the previous one stays latched."
+                  },
+                  "frames": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^[^/*?\\u0000][^*?\\u0000]*$"
+                    },
+                    "description": "1.30.0 (schema 9, additive): forward only these frames and every frame above them (their ancestors, learned from the live tree on /tf and /tf_static), in namespaced and merged mode. Exact source-world names, no globs. Unset forwards every frame. Shaping on the source half, not a security boundary."
+                  },
+                  "frame_max_hz": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "description": "1.30.0 (schema 9, additive): at most this many dynamic transforms a second per child frame on each tf lane, so a slow frame is never starved by a fast one; /tf_static is not limited. 0 or unset: no cap."
+                  },
+                  "frame_prefix": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "pattern": "^([^/\\u0000][^\\u0000]*)?$",
+                    "description": "1.30.0 (schema 9, additive): the prefix written before every rewritten frame name, exactly as given (write the separator: \"ursa/\" or \"ursa_\"); \"\" writes none. Unset: the direction namespace followed by '/'. With it set, merged mode and an entry's frame_prefix: true need no namespace."
+                  },
+                  "frame_rename": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "maxProperties": 64,
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^[^/*?\\u0000][^*?\\u0000]*$"
+                    },
+                    "description": "1.30.0 (schema 9, additive): source frame -> new name, wherever the direction rewrites frames (the merged pair, a merged direction's stamped topics, frame_prefix: true lanes), before the prefix; never on the namespaced pair. Two keys with one value, or a value that is also a key, are refused."
                   }
                 }
               }

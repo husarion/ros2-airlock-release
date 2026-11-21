@@ -130,9 +130,77 @@ The contract is the reason text and the order of the rungs, never a rung's numbe
 8. `rules rejected: <why>`.
 9. `a lane is activating (awaiting the source's ACTIVATED)`.
 
+### Reason codes (engine 1.30.0)
+
+Beside `health.reason` the half writes `health.reason_code`, a stable code for the rung that set the reason. A tool keys on the code and shows the reason to a person: the phrases may gain words, a code never changes its meaning and is never reused. The code is `""` exactly when there is no reason. `monitor.health.reason_code` is the same value.
+
+```yaml
+# status: health.reason_code
+- ""
+- peer.minor_refused
+- peer.pin_refused
+- peer.schema_refused
+- peer.refused
+- peer.not_alive
+- config.epochs_diverged
+- definition.mismatch
+- discovery.foreign_release
+- discovery.blind
+- discovery.deaf
+- discovery.sweep_stalled
+- lane.protected_failed
+- lane.failed
+- service.protected_unarmed
+- lane.backlogged
+- lane.internal_error
+- service.unarmed
+- lane.protected_matching
+- definition.refused
+- config.reload_rejected
+- api.thread_stopped
+- api.socket_unbindable
+- rules.rejected
+- lane.activating
+- discovery.empty_pending
+- discovery.empty_churn
+- world.empty
+- world.empty_passing
+```
+
+| Code | Verdict | Rung |
+| -- | -- | -- |
+| `peer.minor_refused` | dysfunctional | 1, the peer speaks too old a protocol (`proto_minor:`) |
+| `peer.pin_refused` | dysfunctional | 2, another iceoryx2 pin (`transport_pin:`) |
+| `peer.schema_refused` | dysfunctional | 3, another config schema (`config_schema:`) |
+| `peer.refused` | dysfunctional | 4, the connector refused after peer violations (`peer_violations:`) |
+| `peer.not_alive` | dysfunctional | 5, `control-plane peer not alive` |
+| `config.epochs_diverged` | dysfunctional | 6, `config epochs diverged` |
+| `definition.mismatch` | dysfunctional | 7, a protected lane refused over its definition |
+| `discovery.foreign_release` | dysfunctional | 8, another ROS 2 release's discovery layout |
+| `discovery.blind` | dysfunctional | 9, `participant blind in its world` |
+| `discovery.deaf` | dysfunctional | 10, a cross-check participant sees what this half does not |
+| `discovery.sweep_stalled` | dysfunctional | 11, `graph sweep stalled` |
+| `lane.protected_failed` | dysfunctional | 12, a lane that is not carrying, when the lane the phrase names is protected |
+| `lane.failed` | dysfunctional | 12, the same, when that lane is not protected (engine 1.30.0's review fix; the phrase is the same) |
+| `service.protected_unarmed` | dysfunctional | 13, a protected pinned service not armed |
+| `lane.backlogged` | degraded | 1, a lane carrying stale data |
+| `lane.internal_error` | degraded | 2, an unprotected lane retired |
+| `service.unarmed` | degraded | 3, a pinned service not armed |
+| `lane.protected_matching` | degraded | 4, a protected lane matching |
+| `definition.refused` | degraded | 5, an unprotected lane refused over its definition |
+| `config.reload_rejected` | degraded | 6, `reload rejected: ...` |
+| `api.thread_stopped` | degraded | 7, the host request surface's thread stopped |
+| `api.socket_unbindable` | degraded | 7, the half does not hold its api socket |
+| `rules.rejected` | degraded | 8, `rules rejected: ...` |
+| `lane.activating` | degraded | 9, `a lane is activating ...` |
+| `discovery.empty_pending` | unchecked | the first cross-check of this blind run is pending |
+| `discovery.empty_churn` | unchecked | only passing nodes seen, waiting for a cross-check that sees nobody |
+| `world.empty` | healthy | `world '<world>' is empty: ...` |
+| `world.empty_passing` | healthy | `world '<world>' is empty apart from passing nodes ...` |
+
 ## Lanes
 
-Each `tx` row is a lane this half takes from its world and sends through the wall; each `rx` row is one it receives and publishes into its world; each `services` row is one service lane in either role.
+Each `tx` row is a lane this half takes from its world and sends through the wall; each `rx` row is one it receives and publishes into its world; each `services` row is one service lane in either role. Since 1.30.0 an `rx` row also carries `source`, the name the lane has in the other world, resolved through the exact inverse of its entry's `absolute`, `rename` or `rename_prefix`.
 
 ```yaml
 # status: tx[].state
@@ -203,11 +271,38 @@ A lane row's `reason`, when present, says why it is not carrying:
 - open_failed
 ```
 
-- `demanded_silent`: demanded, active past the 15 s activation grace and nothing taken for 10 s. A silent source is the world's business; the health does not change.
+- `demanded_silent`: demanded, active past the 15 s activation grace and nothing taken for 10 s. A silent source is the world's business; the health does not change. Since 1.30.0 a destination tf row of a direction that sets `tf.frames` or `tf.frame_max_hz` never reads it: when every transform is filtered at the source nothing arrives, and the source's row (`tf_filter.filtered_msgs`) says why.
 - `peer_invalid`: retired for peer violations; `retry_in_s` counts down the backoff.
 - `shm_budget`, `fd_budget`, `arm_rate`, `wake_capacity`, `open_failed`: a glob lane whose activation the live admission refused; it is retried.
 
-The lane refusal reasons that `type_hash_refused`, a service's `refused_reason`, the glob reports' `skipped[]` and the peer's refusals carry: `hash_missing`, `peer_too_old`, `description_timeout`, `unmappable`, `rules_required`, `convert_denied`, `too_large`, `graph_hash_mismatch`, `unvalidatable`, `server_gone`, `type_changed`, `glob_retired`, `excluded`, `expired`, `shm_budget`, `fd_budget`, `arm_rate`, `wake_capacity`, `dest_taken`, `dest_server_exists`, `slots`.
+From engine 1.30.0 a row that carries `reason` also carries `reason_code`, the same code, so a tool reads one key on every row that has a reason: the `tx` and `rx` rows below, a `services` row this half refused (beside its `refused_reason`, or a server-side `definition: refused`) and a `type_hash_refused` row (its definition refusal code, which that row has carried since the cross-release work).
+
+```yaml
+# status: tx[].reason_code
+- demanded_silent
+- shm_budget
+- fd_budget
+- arm_rate
+- wake_capacity
+- open_failed
+```
+
+```yaml
+# status: rx[].reason_code
+- peer_invalid
+- demanded_silent
+- shm_budget
+- fd_budget
+- arm_rate
+- wake_capacity
+- open_failed
+```
+
+The lane refusal reasons that `type_hash_refused`, a service's `refused_reason`, the glob reports' `skipped[]` and the peer's refusals carry: `hash_missing`, `peer_too_old`, `description_timeout`, `unmappable`, `rules_required`, `convert_denied`, `too_large`, `graph_hash_mismatch`, `unvalidatable`, `server_gone`, `type_changed`, `glob_retired`, `excluded`, `expired`, `shm_budget`, `fd_budget`, `arm_rate`, `wake_capacity`, `dest_taken`, `dest_invalid` (1.30.0: a glob match whose mapped name is no valid name, over 255 bytes, or an absolute glob onto the tf pair), `dest_server_exists`, `slots`.
+
+The tf pipeline (1.30.0, `docs/user/namespace-a-robot.md`). A source half's `/tf` and `/tf_static` rows of a direction that sets `tf.frames` or `tf.frame_max_hz` carry `tf_filter`: `frames` (the listed frames), `frame_max_hz`, `filtered` (transforms the frame filter dropped), `filtered_msgs` (messages filtered to nothing, never sent), `rate_dropped` (transforms the per-frame cap dropped), `unparsed` (messages the filter could not read, dropped), and with `frames` also `forwarded` (the kept frames whose transforms cross, the robot's own names, at most 64) with `forwarded_total`, `map_frames` (frames the parent map holds, at most 1024), `unlearned` (frames refused past that bound, forwarded only when listed) and, 30 s after the lanes first carried, `unseen` (listed frames no transform named; doctor `tf.frame_unseen`). A destination row whose frames the half rewrites (`rewrite: true`) carries `frame_prefix` (the prefix written) and `frames_renamed` (frame names its map changed); with `tf.frame_rename` also `rename_collision` (keys whose new name a frame of the robot already crosses under; doctor `tf.rename_collision`) and, 30 s after the rewritten lanes first carried, `rename_unseen` (keys no frame met; doctor `tf.rename_unseen`). None of them changes the health. The `capabilities` list holds `tf_frames` and `tf_rename` from 1.30.0 on.
+
+A `tx` row's `dropped_take` counts takes from the source reader that failed with an error, and loans given back while the half unwound an error; a take that finds the reader empty is never one. An executor can wake for a sample that the previous wake's drain already took, or that a second executor thread took first, and since engine 1.30.0 that wake counts nothing. Up to 1.29.1 it counted one `dropped_take` each, about 2 to 5 % of `forwarded` on a loaded robot while the far side received every sample, so a `dropped_take` rate that falls after an upgrade to 1.30.0 is the fix, not a change in the robot.
 
 ### Class, cap and delivery
 
@@ -654,3 +749,28 @@ The ledger `learn` reads, and the directories the half writes:
 ```
 
 `status` is where this half writes `status_<world>.json`: its world's `status_dir` when the config sets one (1.26.0), else `ipc.dir` (then its warnings are listed once, under `ipc`). `forensics` is the world's `forensics_dir` when set, else `forensics.dir`: the audit rings, the black box, the violation ring and the api audit file land there, and the history ring too when the world sets `forensics_dir` (else it stays in `ipc.dir`). A reader takes a half's status path from the config's `status_dir`, never from the other half's status.
+
+`instance` (engine 1.30.0) names this run of the half: its start on the wall clock in nanoseconds, minted once per process. Every reply on the half's host socket carries the same `instance`, so a status file and a reply can be matched, and a new number means the half restarted. Judge a status file's freshness by `ts_ns` and `instance`, not by its mtime.
+
+## When a half refuses to start (engine 1.30.0)
+
+A half that refuses to start on its host exits 2 and prints one line on stderr, `airlock: refused: <id>: <text>`, where `<text>` is the wording of 1.29.1 and `<id>` is stable:
+
+| Id | The half refuses because |
+| -- | -- |
+| `host.dev_shm` | the standing set (every exact entry at its caps) does not fit this host's `/dev/shm` |
+| `dirs.ipc` | `ipc.dir` cannot be created, is owned by another uid, or others may read or write it |
+| `dirs.permissions` | a world's own `status_dir` or `forensics_dir` is not private to the half |
+| `dirs.forensics` | the shared `forensics.dir` an audit ring or the black box needs cannot be used |
+| `api.socket_dir` | the api socket's directory is missing, a symlink, another uid's or writable by others, or a symlink sits at the socket path |
+| `transport.foreign_owner` | iceoryx2 files of another uid sit under `ipc.dir` (printed beside the FATAL log line) |
+| `iox2.pin_leftover` | iceoryx2 files of another engine release sit under `ipc.dir` while a half of the instance may be alive (printed beside the FATAL log line) |
+| `iox2.registry` | the iceoryx2 node registry on this host is broken and this half may not, or could not, repair it (printed beside the FATAL log line) |
+
+Before it exits, the half writes `refusal_<world>.json` into its status directory (its world's `status_dir`, else `ipc.dir`), whole and by rename ([schema](https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/refusal.schema.json)):
+
+```json
+{"refusal_schema":1,"id":"host.dev_shm","text":"the standing set (every exact entry at its caps) needs ...","t":"2026-11-19T22:15:03Z","exit":2}
+```
+
+The file is not written when the refused directory is the status directory itself (`dirs.ipc` with no `status_dir`, or a refused `status_dir`); stderr and the exit code are then the only record. Every start whose file loads and names its world removes an earlier refusal file first, so a later start that fails another way (exit 1) leaves none behind, and the file's `exit` is the code the half exited with. A file that does not load is not a host refusal: it keeps `airlock: config invalid: <text>` with its exit code (1 for a semantic error, 2 for a schema or parse error), writes no file and, since it names no status directory, removes none either; compare the file's `t` with the time of the start when that matters, and `airlock check --format json` carries the load error. Key on the id, never on the text.

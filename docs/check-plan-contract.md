@@ -183,7 +183,7 @@ The file of [bounded bulk lanes](bounded-bulk-lanes.md), planned; the notes are 
 | `entries[].kind` | string | `topic`, `tf` (a lane of the direction's tf block), `service` or `action`. |
 | `entries[].name` | string | As written; a glob stays a pattern. |
 | `entries[].source` | string | The name in the source world. |
-| `entries[].destination` | string | The name in the destination world, namespace and rename applied. |
+| `entries[].destination` | string | The name in the destination world, namespace and rename applied; since 1.30.0 also `absolute` and a glob's `rename_prefix` (a pattern for a glob). |
 | `entries[].type` | string | The interface type; empty for a glob, whose types are discovered. |
 | `entries[].part_of` | string or null | An action's five parts (two topics, three services) are records of their own that name the action here; null for an entry the file wrote. Count the records without it to count what the file wrote. |
 | `entries[].glob` | boolean | The entry is a pattern. |
@@ -207,6 +207,13 @@ The file of [bounded bulk lanes](bounded-bulk-lanes.md), planned; the notes are 
 | `entries[].max_response_bytes` | integer | Services and actions: the response cap. |
 | `entries[].max_inflight` | integer | Services and actions: requests in flight. |
 | `entries[].pinned` | boolean | Services and actions: the channels open at advertise (a protected entry, or a timeout under 0.5 s); a glob's never do. |
+| `entries[].absolute` | boolean | Present, and `true`, only on an entry with `absolute: true` (1.30.0): `destination` is not under the direction's namespace. |
+| `entries[].tf_filter` | object | Present only on a `tf` record of a direction that sets `tf.frames` or `tf.frame_max_hz` (1.30.0). |
+| `entries[].tf_filter.frames` | array | The listed frames (empty when the direction sets only the cap). |
+| `entries[].tf_filter.frame_max_hz` | number | The per-frame cap, 0 for none. |
+| `entries[].frames_rewritten` | object | Present only when the destination half rewrites this lane's frames, if its type carries any (1.30.0): a merged direction's lanes other than the namespaced tf pair, and every `frame_prefix: true` lane. |
+| `entries[].frames_rewritten.prefix` | string | The prefix written before a frame name: `tf.frame_prefix`, else the namespace and `/`. |
+| `entries[].frames_rewritten.rename` | object | `tf.frame_rename`, source frame to new name, applied before the prefix; empty when the direction sets none. |
 | `watchable` | array | With `--plan` only (1.28.0): every name a host `watch` may follow, one per `api.retain` name of a world's `api:` block, in the block's order. |
 | `watchable[].world` | string | The world whose half serves the watch. |
 | `watchable[].topic` | string | The name, as `api.retain` lists it. |

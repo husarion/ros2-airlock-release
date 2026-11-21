@@ -12,7 +12,7 @@ A useful report names the version (the image tag or digest, or `airlock_half --v
 
 ## What happens after a report
 
-1. We acknowledge the report within five working days and tell you who handles it.
+1. We acknowledge the report within two working days and tell you who handles it.
 2. We assess it: whether it is a vulnerability in the airlock or in an upstream component, which versions it affects, and how severe it is. We tell you the outcome and keep you informed while the work goes on.
 3. The fix ships through our normal release process, with its regression test and the full release gate. A fix in an upstream component reaches you as an updated pin (a new base image, Fast DDS build or vendored library) in an airlock release.
 4. We publish an advisory with the fixed version on the release repository, crediting you unless you asked us not to.
@@ -20,11 +20,11 @@ A useful report names the version (the image tag or digest, or `airlock_half --v
 
 ## Which versions get fixes
 
-The newest release line gets security fixes: a fix arrives as a new patch or minor release of the newest version, and you update to it. Older lines get no fixes until Husarion publishes a support period, which has not been decided yet.
+The newest release line gets security fixes: a fix arrives as a new patch or minor release of the newest version, and you update to it. The airlock that ships in a Husarion robot gets fixes for that robot model's support period, which is at least five years. The airlock used on its own gets fixes in its newest line for as long as the ROS 2 releases it is built for are supported upstream. Older lines get no fixes.
 
 ## Upstream components we watch
 
-A vulnerability in a component the airlock ships is handled like one in the airlock itself. We follow the security advisories and release notes of:
+A vulnerability in a component the airlock ships is handled like one in the airlock itself. These are the components we check for advisories and release notes. The checking is done by hand today; an automated scan of the published SBOMs is planned:
 
 - Fast DDS and Husarion's patched Fast DDS build (`husarion/fastdds-patched`) that the robot images carry
 - Cyclone DDS

@@ -183,6 +183,7 @@ A contract stays served for two engine minor releases or six months after its su
 | `nonfinite` on `sample` | 1.27.1 |
 | `watch`, `action_goal`, `action_cancel`; the codes `not_watchable`, `watchers`, `goals`, `goal_busy`, `goal_not_found` | 1.28.0 |
 | `adapter` on every request; `sample`'s reply fields `demand` and `activated_s` | 1.29.0 |
+| `graph`'s reply field `visible_topics`; the client's `--exit-codes detailed` (no change on the wire) | 1.30.0 |
 
 ## Adapters on the socket (engine 1.29.0)
 
@@ -223,7 +224,7 @@ items:
     purpose: the goals an order becomes
 ```
 
-An item reads `ok`, `missing` (not in the half's graph, no publisher or server, or a lane the half carries reading `no_source`) or `untyped` (present under another type). A `min_hz` is measured only on a lane the half carries or retains: below it the item reads `slow`, on a lazy lane nobody demands `idle` (an idle lane has no rate, and readiness never wakes it), and on a name the half neither carries nor retains `unmeasured`. A retained name is measured by its standing reader, which the half drains at most every 100 ms (from engine 1.29.1 on the reader's own message wake, coalesced to one drain per 100 ms, or on a 100 ms tick on Humble), so it reads rates up to about 10 Hz on every release: a `min_hz` over 10 on a name the half only retains reads `unmeasured`. The half reads the profile at start and again on every SIGHUP. A profile that does not parse never takes the half down: the half starts without a profile, or keeps the one it was running, and reports the error in its status (`readiness_error`) and in doctor (`readiness.profile_invalid`). `airlock check <airlock.yaml>` refuses a config whose profile does not parse, and `airlock check --readiness <file>` checks one profile alone ([schema](../../schema/readiness.schema.json)). Version 1 has no tf chains.
+An item reads `ok`, `missing` (not in the half's graph, no publisher or server, or a lane the half carries reading `no_source`) or `untyped` (present under another type). A `min_hz` is measured only on a lane the half carries or retains: below it the item reads `slow`, on a lazy lane nobody demands `idle` (an idle lane has no rate, and readiness never wakes it), and on a name the half neither carries nor retains `unmeasured`. A retained name is measured by its standing reader, which the half drains at most every 100 ms (from engine 1.29.1 on the reader's own message wake, coalesced to one drain per 100 ms, or on a 100 ms tick on Humble), so it reads rates up to about 10 Hz on every release: a `min_hz` over 10 on a name the half only retains reads `unmeasured`. The half reads the profile at start and again on every SIGHUP. A profile that does not parse never takes the half down: the half starts without a profile, or keeps the one it was running, and reports the error in its status (`readiness_error`) and in doctor (`readiness.profile_invalid`). `airlock check <airlock.yaml>` refuses a config whose profile does not parse, and `airlock check --readiness <file>` checks one profile alone ([schema](https://raw.githubusercontent.com/husarion/ros2-airlock-release/main/schema/readiness.schema.json)). Version 1 has no tf chains.
 
 ## Every key of the `api:` block
 
@@ -267,7 +268,7 @@ A name under `api.local` must be one the wall does not touch in this world, neit
 From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file. From 1.28.1 on it is built against musl with yaml-cpp built in, so it carries no glibc and runs on any Linux of its architecture:
 
 ```bash
-v=1.29.1; a=arm64
+v=1.30.0; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api
@@ -289,6 +290,34 @@ airlock_api --version
 | `--goal '<json>'` | `action`: the goal as a JSON object (default: none is sent, and the half fills the type's defaults or sends the entry's fixed goal) |
 
 Exit codes: 0 a sample, a graph, or a call the server answered (a `duplicate` of one included); 1 the request ran and brought no answer (`no_publisher`, `timeout`, `blind`, a synthesized call, a duplicate whose first outcome is unknown); 2 there is no socket to ask (no `api:` block for the world, or nothing at the path), and the message names the fallback; 3 the half refused the request (`scope`, `rate`, `not_carried`, `not_allowed`, `not_served`, `invalid_request`, `not_watchable`, `watchers` and the rest), or closed the connection without a reply because it does not admit your uid. `watch` reads these codes its own way (the section above): 0 is a watch the half closed, 1 a lost half; so do `action` and `cancel` (their section).
+
+### One exit code per error code (engine 1.30.0)
+
+`--exit-codes detailed` (on `airlock_api` and on every verb above that runs it) gives each error code its own exit code, so a script needs neither stderr nor the reply to tell them apart. Without the option, or with `--exit-codes classic`, the codes stay the ones above.
+
+| Exit | `error.code` |
+| -- | -- |
+| 0 | success |
+| 2 | usage, or no socket to ask (unchanged) |
+| 10 | `no_publisher` |
+| 11 | `timeout`, and `accept_timeout` (the action server answered the goal too late) |
+| 12 | `blind` |
+| 13 | `internal` |
+| 14 | `no_server` |
+| 15 | `busy`, and the other outcomes a retry cures: `inflight`, `connections`, `watchers`, `goals` (a full slot), `goal_busy` (the action's goal is running), `teardown` (the half stopped or reloaded under the call) |
+| 20 | `not_carried` |
+| 21 | `not_allowed` |
+| 22 | `rate` |
+| 23 | `size` |
+| 24 | `scope` |
+| 25 | `invalid_request` |
+| 26 | `type_unsupported` |
+| 27 | `duplicate` |
+| 39 | any other error code |
+
+10 to 19 are the codes a retry can cure and 20 to 39 the refusals. A code added to the contract later exits 39, so a script written against this table keeps working. Three outcomes that are not an error reply take a code of the table too: a call the half answered with a synthesized reply exits by its reason (`timeout` 11, `busy` and `teardown` 15, `no_client`, the half's client matched no server, as `no_server` 14, `response_over_cap` as `size` 23, any other 39); a `duplicate` of a call or of a goal whose first outcome is unknown or failed exits 27, and one whose first call was answered or whose first goal succeeded exits 0 as before (the option never turns a success into a failure); and an action goal not accepted, timed out or lost for want of a server exits by that reason (`no_server` 14, `accept_timeout` 11, any other 39). The client's own outcomes keep their codes in both modes: 1 when the half was lost mid-stream or a goal ended aborted or canceled, 3 when the half closed the connection without a reply.
+
+`graph`'s reply (1.30.0) carries `visible_topics` after `services_total`: the topics `ros2 topic list` prints, those with no name segment that starts with `_`, counted over the half's whole inventory even when the reply cuts its rows at the size cap. The half's own republications count, since `ros2 topic list` shows them too.
 
 ## The fallback rule
 
