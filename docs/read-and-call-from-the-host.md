@@ -156,6 +156,15 @@ An entry names an action whose server lives in this half's world: an exact actio
 
 Only root may drive an action unless its entry's own `allow_uids` lists more uids; `api.allow_uids` and `trust_own_uid` never extend to actions. `max_duration_s` is required: when it runs out the half cancels the goal and ends the stream with `status: timeout`. `goal:` fixes the goal (a request may omit it, or send it field for field the same; anything else is refused `not_allowed`), and `goal_constraints:` pins single fields while the rest stays free: after the half has built the goal, each listed path must hold its value, else the goal is refused `not_allowed` naming the path. One entry takes one or the other.
 
+A path with an index needs care in YAML. `goal_constraints: { poses[0].header.frame_id: map }` does not parse: in a flow mapping `[` opens a list, yaml-cpp stops with `end of map flow not found`, and the half refuses the file with exit 2. Quote the key (`{ "poses[0].header.frame_id": map }`) or write a block mapping:
+
+```yaml
+          goal_constraints:
+            poses[0].header.frame_id: map
+```
+
+An index pins that one element only: `poses[0].header.frame_id: map` checks the first pose, a goal whose later poses name `odom` passes, and a goal with no `poses[0]` is refused. The path follows the goal type of the release the half runs. `nav2_msgs/action/NavigateThroughPoses` takes `poses[0].header.frame_id` on Jazzy, where `poses` is a list of poses, and `poses.goals[0].header.frame_id` on Lyrical, where `poses` is a `nav_msgs/Goals` holding the list. `check` refuses the other release's path by name (`poses is an array: index it` on Jazzy, `poses[0] indexes a field that is no array` on Lyrical), so check the file against the image the half runs.
+
 The stream is one JSON line per event ([schema](../../schema/api_action.schema.json)): `accepted` with the goal id (32 hex digits) or `accepted: false` with a reason (`rejected`, `no_server` when no server matched within `accept_timeout_s`, nothing sent, `accept_timeout` when the server did not answer in time, the goal then cancelled by its id); then every status change the half sees (`executing`, `canceling`, and the end), never merged; `feedback` at most `api.actions_feedback_max_hz` times a second (default 5), the newest one when several came in between (`coalesced` counts the ones not sent), within the half-wide `api.watch.max_updates_per_s` the watches use too; and one `result` line with `status` `succeeded`, `aborted`, `canceled`, `timeout` or `lost`, after which the half closes the connection. When the half stops with a goal running, it cancels it and ends the stream with `kind: closed`, `reason: teardown`; it does the same with `reason: reload` when a reload takes the action out of `api.actions`, and with `reason: size` when the tool writes more than `api.max_request_bytes` (or 64 lines) on the stream. A goal stream whose tool leaves its lines unread for 10 s is closed, which cancels the goal.
 
 One host goal per action runs at a time: another `action_goal` on it is refused `goal_busy`, naming the active goal's id and owner uid. Never fall back to another client then (`ros2 action send_goal`): that would be the second goal the half refuses. The slot frees when the goal ends, when its cancel is answered `terminated` or `unknown_goal` (for a goal its server confirmed), or when the goal is `lost`: no server matched, or its id left the action's `_action/status`, for `lost_after_s` (default 10), or its cancel was taken and no end followed within `timeout_s + lost_after_s`, when the server may still be ending the old goal while a new one starts. "No server matched" is as DDS reports it: a server that exits cleanly is gone at once, a killed one only after its DDS participant lease (20 s on Fast DDS by default), so a goal on a killed server ends `lost` after that lease plus `lost_after_s`, or `timeout` first when its `max_duration_s` is shorter. A goal the server did not confirm in `accept_timeout_s` keeps the slot until its id has been absent from the status for `lost_after_s`. A request carries an optional `request_id`, as a call does: a retry with the same `request_id` is answered `duplicate` with the first goal's id and outcome, never a second goal. The `request_id` ledger is per action, not per uid: a `request_id` another uid already used reads `duplicate` with that uid's goal.
@@ -174,7 +183,7 @@ The socket's requests and replies form a contract with its own number, separate 
 | -- | -- | -- | -- |
 | 1 | 1.26.0 | current | none |
 
-A contract stays served for two engine minor releases or six months after its successor ships, whichever is longer. Within a contract, fields and codes are only added: a reply field or a code never changes its meaning, and a code is never reused. What contract 1 added, and when:
+A contract stays served for two engine minor releases or six months after its successor ships, whichever is longer. Within a contract, fields and codes are only added: a reply field or a code never changes its meaning, and a code is never reused. A refusal the half writes before it has read which operation the line asked for (`size`, `parse`, `version`, `op`, `slow`) carries `"op": null`; the reply schemas admit that since 1.30.1, and the bytes on the wire did not change. What contract 1 added, and when:
 
 | Added | Engine |
 | -- | -- |
@@ -268,7 +277,7 @@ A name under `api.local` must be one the wall does not touch in this world, neit
 From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file. From 1.28.1 on it is built against musl with yaml-cpp built in, so it carries no glibc and runs on any Linux of its architecture:
 
 ```bash
-v=1.30.0; a=arm64
+v=1.30.1; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api

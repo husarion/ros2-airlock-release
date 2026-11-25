@@ -23,6 +23,19 @@ Every topic, service, and action in the direction gets the prefix: `/scan` becom
 
 This is how a fleet of identical robots shares one network: every robot runs the same internal graph with the same names, each robot's airlock applies its own serial as the namespace, and the fleet world sees `/panther_1234/scan` next to `/lynx_5678/scan` with no collisions.
 
+## Changing the namespace
+
+Since 1.30.1 a new namespace is a reload, not a restart. Write the file with the new `namespace:` and send SIGHUP to both halves; `airlock_half --plan` reads `sighup` for both worlds. The pair moves to the new file together, every name the direction republishes reappears under the new namespace (a latched topic such as the e-stop is delivered again to late joiners under the new name), and the old names leave the fleet world. Neither half restarts, so the robot world is not touched.
+
+The file's `namespace:` is the only namespace a half reads. `ROS_NAMESPACE` in a half's environment does nothing (ROS 2 does not read it either), so an image need not set it and a change of it is no reason to restart a half. If you restart one half onto the new file instead of signalling it, the other half notices the new epoch when the restarted one connects and re-reads its own file once, as a SIGHUP would, so a shared file still converges without a second restart. Two halves whose files really differ still end in an exit: the half whose file on disk is not what it runs (a refused file, an edit nobody signalled) exits after 30 s so its restart picks the file up; a half whose file is what it runs waits longer (45 s for the connector, 60 s for the `ipc.listener` half), so only one half restarts and the robot's half goes last.
+
+This includes entries marked `protected: true`. A reload normally refuses to move a protected entry's name, and a namespace change counts as a move only when something else changes with it. Two shapes pass:
+
+- An entry of the direction whose namespace changed keeps its source name, its `rename` and its `absolute` setting. Its new name is its old name under the new namespace.
+- An inbound entry (fleet to robot) whose source lives under the robot's namespace, written as `/panther_1234/autonomous/cmd_vel` with `rename: /autonomous/cmd_vel`, moves its source to `/<new namespace>/autonomous/cmd_vel` and keeps its `rename`. Its name in the robot world does not change.
+
+The reload is still refused, and the halves keep the running file, when the same file also renames a protected entry, changes its type, removes its `protected` mark, drops it, or puts another entry on its new name. Protected services and the parts of a protected action follow the same rules.
+
 ## Renaming an action
 
 An exact action entry takes `rename` the way a topic or a service does (1.30.0). The action appears as the namespace plus the new name, and its five parts follow it: the three services `<rename>/_action/send_goal`, `get_result` and `cancel_goal`, and the two topics `<rename>/_action/feedback` and `status`.
@@ -71,10 +84,10 @@ What the engine refuses or skips:
 
 - `rename` on a glob is refused at load, as before.
 - Two globs of one direction whose destination prefixes can produce one name from different sources are refused at load (`rename.ambiguous`), because the receiving half could not tell which entry a name came from. Globs without a prefix map overlap as they always could.
-- A match whose mapped name an exact entry of the direction holds, or another source's lane already carries, is skipped and counted as `dest_taken` in the glob's status row; the exact entry keeps the name.
+- An exact entry wins on a shared source as well as on a shared destination. A match whose source name an exact entry of the direction also names crosses only by that entry, under the exact entry's destination, and the glob counts it as `exact` in its status row (topic globs from 1.30.1, as service and action globs always did). A match whose mapped name an exact entry of the direction holds, or another source's lane already carries, is skipped and counted as `dest_taken`; the exact entry keeps the name.
 - A match whose mapped name is not a valid ROS name or is longer than 255 bytes is skipped as `dest_invalid`, never truncated.
 
-`airlock check --plan` prints each entry's destination name or pattern when it uses one of these keys, and `airlock doctor` names `dest_taken` and `dest_invalid` skips with their glob. The receiving half's lane rows carry `source`, the name the lane came from. Every half that reads a config with one of the three keys must be 1.30.0 or later; an older half refuses the file as an unknown key.
+`airlock check --plan` prints each entry's destination name or pattern when it uses one of these keys, and `airlock doctor` names `exact`, `dest_taken` and `dest_invalid` skips with their glob. The receiving half's lane rows carry `source`, the name the lane came from. Every half that reads a config with one of the three keys must be 1.30.0 or later; an older half refuses the file as an unknown key.
 
 ## TF: two conventions, both supported
 

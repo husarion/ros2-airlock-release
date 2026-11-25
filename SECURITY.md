@@ -32,7 +32,7 @@ A vulnerability in a component the airlock ships is handled like one in the airl
 - rclcpp and the rest of the ROS 2 core in the images
 - iceoryx2 and the Rust crates vendored with it
 - yaml-cpp
-- the `ros:<distro>-ros-base` base images and the Ubuntu packages they contain
+- the `husarion/ros:<distro>-ros-base-<date>` base images (Husarion's shared ROS base, built on the official ROS images) and the Ubuntu packages they contain
 
 Every release publishes a CycloneDX SBOM for each image and each `airlock_api` binary (see [Verify the images](https://github.com/husarion/ros2-airlock-release/blob/main/docs/verify-images.md)), so you can match a published advisory against exactly what you run.
 
