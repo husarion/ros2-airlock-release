@@ -277,7 +277,7 @@ A name under `api.local` must be one the wall does not touch in this world, neit
 From engine 1.27.0 the three verbs run `airlock_api`, a small native program that speaks to the socket without starting Python or ROS (the image has it at `/opt/ros2_airlock/lib/ros2_airlock/airlock_api`). It takes the same arguments with the verb first, `airlock_api sample /hardware/e_stop --socket /run/airlock-robot/api/api.sock`, prints the same output and exits with the same codes. Every GitHub Release also carries it as one statically linked file per architecture, `airlock_api-<version>-linux-amd64` and `airlock_api-<version>-linux-arm64`, each with a `.sha256` beside it. It needs no ROS install and no shared library, so a host installs it by copying that file. From 1.28.1 on it is built against musl with yaml-cpp built in, so it carries no glibc and runs on any Linux of its architecture:
 
 ```bash
-v=1.30.1; a=arm64
+v=1.30.2; a=arm64
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a
 curl -LO https://github.com/husarion/ros2-airlock-release/releases/download/v$v/airlock_api-$v-linux-$a.sha256
 sha256sum -c airlock_api-$v-linux-$a.sha256 && install -m 0755 airlock_api-$v-linux-$a /usr/local/bin/airlock_api

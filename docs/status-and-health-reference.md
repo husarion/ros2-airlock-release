@@ -360,6 +360,14 @@ The executor that takes a `tx` lane (`exc` for control and normal, `exb` the bul
 - 1
 ```
 
+Since 1.30.2 a `tx` row also says whether a frame waits for its `max_hz` window to end. A frame that arrives inside the window is held, not dropped; a newer one replaces it (the replaced frame counts `dropped_rate`), and once the source has been quiet for 100 ms the held frame is sent, 100 to 200 ms after the window's end, so the newest frame of a burst always crosses. A source that keeps publishing never waits for that: its next arrival after the window end is forwarded. The lane holds one frame at a time, for the rate or for the byte cap:
+
+```yaml
+# status: tx[].rate_held
+- 0
+- 1
+```
+
 The numeric fields beside them: `cap_bytes_per_s`, `cap_fill`, `dropped_cap`, `dropped_cap_bytes`, `class_moves` on `tx` rows; `cap_bytes_per_s`, `cap_bound_bytes_per_s`, `dropped_cap`, `cap_exceeded`, `class_moves`, `delivery_age_p50_us`, `delivery_age_p99_us`, `delivery_age_max_us`, `delivery_age_samples` and `max_gap_us` on `rx` rows. A service row always reads `class: control`.
 
 Since 1.26.0 a window that carried no sample says so by itself: `delivery_age_p50_us`, `delivery_age_p99_us` and `delivery_age_max_us` read null when `delivery_age_samples` is 0, and `max_gap_us` reads null when the window closed no interval (no sample, or the lane's first publish ever: a gap counts in the window of its second publish). Before 1.26.0 they read 0, which looked like a perfect window. `delivery_age_samples` is always an integer and is the field to branch on; a row without it comes from an engine before 1.25.0. The `classes` summary's `delivery_age_p99_us` and `max_gap_us` read null when no `rx` lane of the class carried a sample in the window (or closed an interval, for the gap); its `lanes`, `forwarded` and `dropped_cap` stay integers. `/metrics` leaves out a lane's `airlock_rx_delivery_age_us` and `airlock_rx_delivery_age_max_us` series in such a window, and its `airlock_rx_max_gap_us` series when no interval closed; `airlock_rx_forwarded_total` tells an idle lane. See [bounded bulk lanes](bounded-bulk-lanes.md).

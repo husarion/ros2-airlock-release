@@ -111,6 +111,7 @@ Each half's status file carries the numbers:
 | `cap_bytes_per_s` | `tx`, `rx` | The lane's cap; 0 for none |
 | `dropped_cap`, `dropped_cap_bytes` | `tx` | Samples (and their bytes) the cap dropped at the source |
 | `cap_held` | `tx` | 1 while a sample waits for the cap |
+| `rate_held` | `tx` | 1 while a frame waits for its `max_hz` window to end (1.30.2); the lane's one held slot serves the rate or the cap, never both |
 | `cap_fill` | `tx` | Bytes the cap would admit right now |
 | `executor` | `tx` | `exb` for the bulk thread, `exc` for the others |
 | `class_moves` | `tx` | How often the lane moved class while running |
